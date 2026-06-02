@@ -1,0 +1,27 @@
+import { cn } from "@/lib/utils";
+
+type ScoreBarsProps = {
+  scores: { label: string; value: number }[];
+  compact?: boolean;
+};
+
+export function ScoreBars({ scores, compact = false }: ScoreBarsProps) {
+  return (
+    <div className="grid gap-3">
+      {scores.map((score) => (
+        <div key={score.label} className="grid gap-2">
+          <div className="flex items-center justify-between text-xs uppercase tracking-[0.22em] text-muted-foreground">
+            <span>{score.label}</span>
+            <span className="text-foreground">{score.value}</span>
+          </div>
+          <div className={cn("h-2 rounded-full bg-white/8", compact && "h-1.5")}>
+            <div
+              className="h-full rounded-full bg-[linear-gradient(90deg,rgba(34,211,238,0.95),rgba(52,211,153,0.92))]"
+              style={{ width: `${score.value}%` }}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}

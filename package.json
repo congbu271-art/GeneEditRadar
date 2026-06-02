@@ -1,0 +1,48 @@
+{
+  "name": "gene-edit-radar",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "npm@11.16.0",
+  "engines": {
+    "node": "24.x"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "postinstall": "prisma generate",
+    "test": "node --import tsx --test tests/*.test.ts tests/*.test.tsx",
+    "test:watch": "node --import tsx --test --watch tests/*.test.ts tests/*.test.tsx",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:seed": "prisma db seed",
+    "db:init": "mkdir -p .tools && rm -f prisma/dev.db prisma/dev.db-journal && prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script > .tools/init.sql && sqlite3 prisma/dev.db < .tools/init.sql"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.0.0",
+    "@radix-ui/react-slot": "^1.1.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.525.0",
+    "next": "^15.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tailwind-merge": "^3.3.1",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "autoprefixer": "^10.4.20",
+    "dotenv": "^16.5.0",
+    "eslint": "^9.39.1",
+    "eslint-config-next": "^15.5.18",
+    "postcss": "^8.4.49",
+    "prisma": "^6.0.0",
+    "tailwindcss": "^3.4.17",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

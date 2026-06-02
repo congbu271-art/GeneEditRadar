@@ -1,0 +1,205 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum PaperStage {
+  PRECLINICAL
+  CLINICAL
+  PLATFORM
+}
+
+enum PaperStatus {
+  TRENDING
+  WATCHLIST
+  FOUNDATIONAL
+}
+
+enum SubscriptionCadence {
+  DAILY
+  WEEKLY
+  BIWEEKLY
+}
+
+enum IdeaStage {
+  DISCOVERY
+  VALIDATION
+  INCUBATION
+}
+
+enum EvaluationVerdict {
+  STRONG
+  WATCH
+  PASS
+}
+
+model Journal {
+  id              String          @id @default(cuid())
+  slug            String          @unique
+  name            String          @unique
+  publisher       String
+  summary         String
+  impactFactor    Float
+  reviewSpeedDays Int
+  acceptanceRate  Float
+  openAccess      Boolean         @default(false)
+  region          String
+  coverageScore   Int             @default(0)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  papers          Paper[]
+  subscriptions   Subscription[]
+  journalTopics   JournalTopic[]
+}
+
+model Topic {
+  id            String          @id @default(cuid())
+  slug          String          @unique
+  label         String          @unique
+  description   String
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  papers        Paper[]
+  ideas         Idea[]
+  subscriptions Subscription[]
+  journalTopics JournalTopic[]
+}
+
+model JournalTopic {
+  journalId  String
+  topicId    String
+  createdAt  DateTime @default(now())
+  journal    Journal  @relation(fields: [journalId], references: [id], onDelete: Cascade)
+  topic      Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@id([journalId, topicId])
+}
+
+model Author {
+  id          String   @id @default(cuid())
+  name        String
+  affiliation String
+  country     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  papers      Paper[]
+}
+
+model GeneTarget {
+  id            String          @id @default(cuid())
+  symbol        String          @unique
+  name          String
+  pathway       String
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  papers        Paper[]
+  subscriptions Subscription[]
+}
+
+model Paper {
+  id                 String       @id @default(cuid())
+  slug               String       @unique
+  title              String
+  normalizedTitle    String
+  abstract           String
+  doi                String?      @unique
+  pmid               String?      @unique
+  publishedAt        DateTime
+  modality           String
+  diseaseArea        String
+  stage              PaperStage
+  status             PaperStatus
+  noveltyScore       Int
+  momentumScore      Int
+  translationalScore Int
+  evidenceScore      Int
+  compositeScore     Int
+  citationCount      Int          @default(0)
+  clinicalSignal     String
+  keyTakeaway        String
+  marketSignal       String
+  externalSource     String?
+  sourceUrl          String?
+  organismsText      String?
+  editorTypesText    String?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  journalId          String
+  journal            Journal      @relation(fields: [journalId], references: [id], onDelete: Restrict)
+  authors            Author[]
+  geneTargets        GeneTarget[]
+  topics             Topic[]
+  ideas              Idea[]
+
+  @@index([publishedAt])
+  @@index([compositeScore])
+  @@index([journalId])
+  @@index([normalizedTitle])
+}
+
+model Subscription {
+  id              String               @id @default(cuid())
+  label           String
+  cadence         SubscriptionCadence
+  signalThreshold Int
+  notes           String
+  isActive        Boolean              @default(true)
+  keywordsText    String?
+  authorNamesText String?
+  journalNamesText String?
+  organismsText   String?
+  editorTypesText String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  journalId       String?
+  journal         Journal?             @relation(fields: [journalId], references: [id], onDelete: SetNull)
+  topicId         String?
+  topic           Topic?               @relation(fields: [topicId], references: [id], onDelete: SetNull)
+  geneTargetId    String?
+  geneTarget      GeneTarget?          @relation(fields: [geneTargetId], references: [id], onDelete: SetNull)
+
+  @@index([isActive])
+}
+
+model Idea {
+  id        String      @id @default(cuid())
+  slug      String      @unique
+  title     String
+  thesis    String
+  customer  String
+  wedge     String
+  moat      String
+  risk      String
+  stage     IdeaStage
+  score     Int
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  paperId   String?
+  paper     Paper?      @relation(fields: [paperId], references: [id], onDelete: SetNull)
+  topicId   String?
+  topic     Topic?      @relation(fields: [topicId], references: [id], onDelete: SetNull)
+  evaluations Evaluation[]
+
+  @@index([score])
+}
+
+model Evaluation {
+  id             String             @id @default(cuid())
+  technicalFit   Int
+  marketFit      Int
+  defensibility  Int
+  executionSpeed Int
+  compositeScore Int
+  verdict        EvaluationVerdict
+  notes          String
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  ideaId         String?
+  idea           Idea?              @relation(fields: [ideaId], references: [id], onDelete: SetNull)
+
+  @@index([verdict])
+}
