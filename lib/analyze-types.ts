@@ -12,7 +12,7 @@ export type TechnologyTransferPath =
   | "delivery_optimization"
   | "specificity_optimization";
 
-export type AnalyzeReliabilityLabel = "元数据" | "规则解析" | "启发式评分" | "AI生成假设";
+export type AnalyzeReliabilityLabel = "元数据" | "规则解析" | "启发式评分" | "AI生成假设" | "AI综述";
 
 export type AnalyzeRequestInput = {
   mode: AnalyzeMode;

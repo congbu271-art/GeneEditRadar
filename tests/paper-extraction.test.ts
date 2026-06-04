@@ -59,23 +59,29 @@ test("llm refinement fills only missing fields when OPENAI_API_KEY exists", asyn
   globalThis.fetch = async () =>
     new Response(
       JSON.stringify({
-        output_text: JSON.stringify({
-          editingTool: "wrong tool",
-          editorVariant: "custom payload architecture",
-          editingType: "Prime editing",
-          organism: "Primate",
-          deliveryMethod: "not reported",
-          targetGene: "not reported",
-          targetTrait: "cholesterol lowering",
-          editingEfficiency: "not reported",
-          offTargetAnalysis: "GUIDE-seq not reported",
-          phenotypeValidation: "not reported",
-          mainInnovation: "not reported",
-          limitations: "not reported",
-          paperType: "preclinical study",
-          followUpOpportunities: "not reported",
-          extractionMethod: "rule-based+llm",
-        }),
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                editingTool: "wrong tool",
+                editorVariant: "custom payload architecture",
+                editingType: "Prime editing",
+                organism: "Primate",
+                deliveryMethod: "not reported",
+                targetGene: "not reported",
+                targetTrait: "cholesterol lowering",
+                editingEfficiency: "not reported",
+                offTargetAnalysis: "GUIDE-seq not reported",
+                phenotypeValidation: "not reported",
+                mainInnovation: "not reported",
+                limitations: "not reported",
+                paperType: "preclinical study",
+                followUpOpportunities: "not reported",
+                extractionMethod: "rule-based+llm",
+              }),
+            },
+          },
+        ],
       }),
       {
         status: 200,
@@ -123,9 +129,15 @@ test("invalid llm output falls back to rule-based extraction after zod validatio
   globalThis.fetch = async () =>
     new Response(
       JSON.stringify({
-        output_text: JSON.stringify({
-          editingTool: 42,
-        }),
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                editingTool: 42,
+              }),
+            },
+          },
+        ],
       }),
       {
         status: 200,

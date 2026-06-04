@@ -41,6 +41,13 @@ import type {
   TechnologyTransferPath,
   TechnologyTransferPathSummary,
 } from "@/lib/analyze-types";
+import { isLlmEnabled } from "@/lib/llm";
+import {
+  buildFieldOverviewWithLlm,
+  buildPaperInsightsWithLlm,
+  type FieldOverviewAnchors,
+  type PaperInsightsLlm,
+} from "@/lib/analyze-llm";
 
 export type {
   AnalyzeEvaluation,
@@ -466,6 +473,89 @@ async function searchPubMedByReference(detection: PaperQueryDetection): Promise<
   }
 
   return searchPubMedByKeyword(`"${detection.normalizedQuery}"`, 5);
+}
+
+/**
+ * PubMed 的 esummary 接口不返回摘要，导致 PubMed-only 命中的论文 abstract 为空，
+ * 喂给 LLM/抽取时无料可用。这里用 efetch 批量补摘要（单请求，遵守 E-utilities 频率限制）。
+ * 仅在配置了 LLM 时执行（否则规则引擎不依赖摘要，省去一次外部请求）。失败静默跳过。
+ */
+async function fetchPubMedAbstracts(pmids: string[]): Promise<Map<string, string>> {
+  const result = new Map<string, string>();
+
+  if (pmids.length === 0) {
+    return result;
+  }
+
+  const url = new URL("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi");
+  url.search = new URLSearchParams({
+    db: "pubmed",
+    id: pmids.slice(0, 8).join(","),
+    rettype: "abstract",
+    retmode: "xml",
+    tool: "GeneEditRadar",
+  }).toString();
+
+  try {
+    const response = await fetch(url, {
+      headers: { accept: "application/xml", "user-agent": "GeneEditRadar/0.1" },
+      next: { revalidate: 1800 },
+      signal: AbortSignal.timeout(API_TIMEOUT_MS),
+    });
+
+    if (!response.ok) {
+      return result;
+    }
+
+    const xml = await response.text();
+
+    // 逐篇 <PubmedArticle> 解析，提取 PMID 与拼接后的 <AbstractText>。
+    const articles = xml.split(/<PubmedArticle[>\s]/).slice(1);
+    for (const article of articles) {
+      const pmidMatch = article.match(/<PMID[^>]*>(\d+)<\/PMID>/);
+      if (!pmidMatch) {
+        continue;
+      }
+
+      const abstractParts = article.match(/<AbstractText[^>]*>([\s\S]*?)<\/AbstractText>/g) ?? [];
+      const abstract = stripMarkup(abstractParts.map((part) => part.replace(/<[^>]+>/g, " ")).join(" "));
+
+      if (abstract) {
+        result.set(pmidMatch[1], abstract);
+      }
+    }
+  } catch {
+    // 网络/超时/解析失败：保持空，下游照常回退。
+  }
+
+  return result;
+}
+
+/**
+ * 对最终入选的 top-N 论文回填缺失摘要（仅 PubMed-only 且 abstract 为空者）。
+ * 仅在 LLM 启用时执行。返回新数组，不改动展示用 AnalyzePaper 契约。
+ */
+async function backfillPubMedAbstracts(papers: RankedPaper[]): Promise<RankedPaper[]> {
+  if (!isLlmEnabled()) {
+    return papers;
+  }
+
+  const needsAbstract = papers.filter((paper) => !paper.abstract && paper.pmid);
+  if (needsAbstract.length === 0) {
+    return papers;
+  }
+
+  const abstracts = await fetchPubMedAbstracts(needsAbstract.map((paper) => paper.pmid as string));
+  if (abstracts.size === 0) {
+    return papers;
+  }
+
+  return papers.map((paper) => {
+    if (!paper.abstract && paper.pmid && abstracts.has(paper.pmid)) {
+      return { ...paper, abstract: abstracts.get(paper.pmid) as string };
+    }
+    return paper;
+  });
 }
 
 async function searchEuropePmc(query: string, limit = DEFAULT_ANALYSIS_LIMIT): Promise<SourceResult> {
@@ -1890,6 +1980,130 @@ export function buildPaperModeIdeas(
     .slice(0, DEFAULT_PAPER_IDEA_LIMIT);
 }
 
+// ---------- LLM 洞察 → 现有结构装配（打分仍走规则，保证口径一致） ----------
+
+function buildLlmTransferPathSummaries(insights: PaperInsightsLlm): TechnologyTransferPathSummary[] {
+  const seen = new Set<TechnologyTransferPath>();
+  const summaries: TechnologyTransferPathSummary[] = [];
+
+  for (const item of insights.transferPaths) {
+    if (seen.has(item.path)) {
+      continue;
+    }
+    seen.add(item.path);
+    summaries.push({
+      path: item.path,
+      label: transferPathLabelMap[item.path],
+      rationale: item.rationale,
+      priority: item.priority,
+      reliabilityLabel: "规则解析",
+    });
+  }
+
+  return summaries.slice(0, DEFAULT_PAPER_IDEA_LIMIT);
+}
+
+function buildLlmPaperStrategySummary(insights: PaperInsightsLlm): PaperStrategySummary {
+  const { strategySummary } = insights;
+  const evidenceChain = uniqueNonReported(strategySummary.evidenceChain);
+  const limitations = uniqueNonReported(strategySummary.limitations);
+
+  return {
+    overallStrategy: strategySummary.overallStrategy || ANALYZE_NOT_REPORTED,
+    whyPublishable: strategySummary.whyPublishable || ANALYZE_NOT_REPORTED,
+    coreInnovation: strategySummary.coreInnovation || ANALYZE_NOT_REPORTED,
+    evidenceChain: evidenceChain.length > 0 ? evidenceChain : [ANALYZE_NOT_REPORTED],
+    limitations: limitations.length > 0 ? limitations : [ANALYZE_NOT_REPORTED],
+  };
+}
+
+function buildLlmPaperModeIdeas(
+  seedPaper: IdeaSeedPaper,
+  extraction: GeneEditingExtraction,
+  insights: PaperInsightsLlm,
+): AnalyzeIdea[] {
+  const priorityByPath = new Map<TechnologyTransferPath, "高" | "中" | "低">(
+    insights.transferPaths.map((item) => [item.path, item.priority]),
+  );
+
+  const ideas = insights.ideas.map((draft, index) => {
+    const ideaType = mapTransferPathToIdeaType(draft.path);
+    const priority = priorityByPath.get(draft.path) ?? "中";
+    const evaluation = evaluateGeneEditingIdea({
+      title: draft.title,
+      summary: draft.innovationLogic,
+      suggestedIdeaType: ideaType,
+      sourcePaperContext: { paper: seedPaper, extraction },
+    });
+    const localizedEvaluation = getLocalizedEvaluationCopy(evaluation, toSyntheticRadarPaper(seedPaper));
+    const adjustedScores = applyPriorityAdjustments(evaluation, priority, draft.title);
+    const suggestedJournalTier = toZhJournalTier(
+      selectJournalTierFromScores(
+        adjustedScores.novelty,
+        adjustedScores.feasibility,
+        adjustedScores.publicationPotential,
+        adjustedScores.competitionRisk,
+      ),
+    );
+    const minimumExperimentPackage =
+      draft.minimumExperimentPackage.length > 0
+        ? uniqueNonReported(draft.minimumExperimentPackage)
+        : localizedEvaluation.minimumExperimentalPackage;
+    const riskWarnings = uniqueNonReported([
+      ...(priority === "低" ? ["当前方向更接近技术验证，需避免仅重复原论文场景。"] : []),
+      ...draft.riskWarnings,
+      ...(evaluation.isIncremental ? ["若只完成单靶点验证，容易被评价为低创新增量研究。"] : []),
+    ]);
+
+    return {
+      id: `paper-mode-idea-llm-${index + 1}-${slugify(draft.path)}`,
+      name: draft.title,
+      innovationType: toZhIdeaType(ideaType),
+      transferPath: transferPathLabelMap[draft.path],
+      priority,
+      basedOnPapers: [seedPaper.title],
+      innovationLogic: draft.innovationLogic,
+      feasibilityRisk: riskWarnings[0] ?? ANALYZE_NOT_REPORTED,
+      feasibilityRationale: draft.feasibilityRationale || ANALYZE_NOT_REPORTED,
+      minimumExperimentalPackage: minimumExperimentPackage,
+      minimumExperimentPackage,
+      recommendedJournalTier: suggestedJournalTier,
+      suggestedJournalTier,
+      articleType: localizedEvaluation.articleType,
+      novelty: adjustedScores.novelty,
+      noveltyScore: adjustedScores.novelty,
+      feasibility: adjustedScores.feasibility,
+      feasibilityScore: adjustedScores.feasibility,
+      publicationPotential: adjustedScores.publicationPotential,
+      publicationPotentialScore: adjustedScores.publicationPotential,
+      competitionRisk: adjustedScores.competitionRisk,
+      warning: evaluation.warning,
+      riskWarnings,
+      reliabilityLabel: "AI生成假设" as const,
+    };
+  });
+
+  return ideas
+    .sort((left, right) => {
+      const priorityDelta = priorityWeight(right.priority) - priorityWeight(left.priority);
+      if (priorityDelta !== 0) {
+        return priorityDelta;
+      }
+
+      return right.publicationPotentialScore - left.publicationPotentialScore || right.noveltyScore - left.noveltyScore;
+    })
+    .slice(0, DEFAULT_PAPER_IDEA_LIMIT);
+}
+
+function buildFieldOverviewAnchors(features: GeneEditingFeature[]): FieldOverviewAnchors {
+  return {
+    tools: topCounts(features.flatMap((feature) => splitFeatureValues(feature.editingTool))),
+    organisms: topCounts(features.flatMap((feature) => splitFeatureValues(feature.organism))),
+    deliveries: topCounts(features.flatMap((feature) => splitFeatureValues(feature.deliveryMethod))),
+    applications: topCounts(features.flatMap((feature) => splitFeatureValues(feature.targetTrait))),
+  };
+}
+
 export function buildFieldOverview(analyzedPapers: AnalyzePaper[], features: GeneEditingFeature[]) {
   const currentStatus =
     analyzedPapers.length >= 6
@@ -2123,7 +2337,7 @@ export async function analyzeResearchInput(input: AnalyzeRequestInput): Promise<
     throw new Error("分析流程未返回结果。");
   }
 
-  const rankedPapers = queryResult.papers.slice(0, mode === "keyword" ? 8 : 6);
+  const rankedPapers = await backfillPubMedAbstracts(queryResult.papers.slice(0, mode === "keyword" ? 8 : 6));
   const extracted = await Promise.all(
     rankedPapers.map(async (paper) => ({
       paper,
@@ -2133,20 +2347,48 @@ export async function analyzeResearchInput(input: AnalyzeRequestInput): Promise<
 
   const analyzedPapers = extracted.map(({ paper }) => toAnalyzePaper(paper));
   const structuredFeatures = extracted.map(({ paper, extraction }) => toStructuredFeature(paper, extraction));
-  const fieldOverview = buildFieldOverview(analyzedPapers, structuredFeatures);
   const seedExtracted =
     mode === "paper" && paperResult?.seed
       ? extracted.find((item) => item.paper.id === paperResult.seed?.id) ?? extracted[0]
       : undefined;
   const seedPaper = seedExtracted ? toAnalyzePaper(seedExtracted.paper) : undefined;
   const seedIdeaPaper = seedExtracted ? buildIdeaSeedPaper(seedExtracted.paper, seedExtracted.extraction, query) : undefined;
+
+  // keyword 模式：优先用 LLM 基于真实文献生成领域概览，失败/未启用回退规则版。
+  const fieldOverview =
+    (mode === "keyword" && isLlmEnabled()
+      ? await buildFieldOverviewWithLlm(analyzedPapers, structuredFeatures, buildFieldOverviewAnchors(structuredFeatures))
+      : null) ?? buildFieldOverview(analyzedPapers, structuredFeatures);
+
+  // paper 模式：优先用 LLM 基于种子论文生成策略解读 + 迁移路径 + 衍生课题，失败/未启用回退规则版。
+  const paperInsights =
+    mode === "paper" && seedIdeaPaper && seedExtracted && isLlmEnabled()
+      ? await buildPaperInsightsWithLlm({
+          seed: {
+            title: seedExtracted.paper.title,
+            abstract: seedExtracted.paper.abstract,
+            journal: seedExtracted.paper.journal,
+            organisms: seedExtracted.paper.organisms,
+            editorTypes: seedExtracted.paper.editorTypes,
+          },
+          extraction: seedExtracted.extraction as unknown as Record<string, string>,
+          relatedPapers: analyzedPapers
+            .filter((paper) => paper.id !== seedPaper?.id)
+            .map((paper) => ({ title: paper.title, abstract: paper.abstract })),
+        })
+      : null;
+
   const technologyTransferPaths =
     mode === "paper" && seedIdeaPaper && seedExtracted
-      ? classifyTechnologyTransferPath(seedIdeaPaper, seedExtracted.extraction)
+      ? paperInsights
+        ? buildLlmTransferPathSummaries(paperInsights)
+        : classifyTechnologyTransferPath(seedIdeaPaper, seedExtracted.extraction)
       : undefined;
   const paperStrategySummary =
     mode === "paper" && seedPaper && seedExtracted
-      ? buildPaperStrategySummary(seedPaper, toStructuredFeature(seedExtracted.paper, seedExtracted.extraction), technologyTransferPaths ?? [])
+      ? paperInsights
+        ? buildLlmPaperStrategySummary(paperInsights)
+        : buildPaperStrategySummary(seedPaper, toStructuredFeature(seedExtracted.paper, seedExtracted.extraction), technologyTransferPaths ?? [])
       : undefined;
 
   const generatedIdeas =
@@ -2166,7 +2408,9 @@ export async function analyzeResearchInput(input: AnalyzeRequestInput): Promise<
 
   const ideas: AnalyzeIdea[] =
     mode === "paper" && seedIdeaPaper && seedExtracted
-      ? buildPaperModeIdeas(seedIdeaPaper, seedExtracted.extraction, technologyTransferPaths ?? [])
+      ? paperInsights
+        ? buildLlmPaperModeIdeas(seedIdeaPaper, seedExtracted.extraction, paperInsights)
+        : buildPaperModeIdeas(seedIdeaPaper, seedExtracted.extraction, technologyTransferPaths ?? [])
       : generatedIdeas.map(({ idea, seedPaper: generatedSeedPaper, extraction }) => {
           const localizedSeedPaper = toSyntheticRadarPaper(generatedSeedPaper);
           const localizedIdea = getLocalizedIdeaCopy({ ...idea, paper: localizedSeedPaper });

@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { authors, geneTargets, getPaperById, journals, type RadarPaper } from "@/lib/mock-data";
+import { isLlmEnabled, llmJson } from "@/lib/llm";
 
 export const NOT_REPORTED = "not reported";
 
@@ -36,55 +37,6 @@ export type ExtractionSourcePaper = {
   editorTypes: string[];
   appPaperId?: string;
 };
-
-type LlmResponsePayload = {
-  output_text?: string;
-  output?: Array<{
-    content?: Array<{
-      type?: string;
-      text?: string | { value?: string };
-    }>;
-  }>;
-};
-
-const EXTRACTION_JSON_SCHEMA = {
-  type: "object",
-  additionalProperties: false,
-  properties: {
-    editingTool: { type: "string" },
-    editorVariant: { type: "string" },
-    editingType: { type: "string" },
-    organism: { type: "string" },
-    deliveryMethod: { type: "string" },
-    targetGene: { type: "string" },
-    targetTrait: { type: "string" },
-    editingEfficiency: { type: "string" },
-    offTargetAnalysis: { type: "string" },
-    phenotypeValidation: { type: "string" },
-    mainInnovation: { type: "string" },
-    limitations: { type: "string" },
-    paperType: { type: "string" },
-    followUpOpportunities: { type: "string" },
-    extractionMethod: { type: "string", enum: ["rule-based", "rule-based+llm"] },
-  },
-  required: [
-    "editingTool",
-    "editorVariant",
-    "editingType",
-    "organism",
-    "deliveryMethod",
-    "targetGene",
-    "targetTrait",
-    "editingEfficiency",
-    "offTargetAnalysis",
-    "phenotypeValidation",
-    "mainInnovation",
-    "limitations",
-    "paperType",
-    "followUpOpportunities",
-    "extractionMethod",
-  ],
-} as const;
 
 const LLM_REFINABLE_FIELDS: RefinableExtractionField[] = [
   "editorVariant",
@@ -496,110 +448,50 @@ export function extractGeneEditingDetailsRuleBased(sourcePaper: ExtractionSource
   );
 }
 
-function getOpenAiOutputText(payload: LlmResponsePayload) {
-  if (typeof payload.output_text === "string" && payload.output_text.trim().length > 0) {
-    return payload.output_text.trim();
-  }
-
-  for (const item of payload.output ?? []) {
-    for (const contentItem of item.content ?? []) {
-      if (typeof contentItem.text === "string" && contentItem.text.trim().length > 0) {
-        return contentItem.text.trim();
-      }
-
-      if (typeof contentItem.text === "object" && typeof contentItem.text?.value === "string" && contentItem.text.value.trim().length > 0) {
-        return contentItem.text.value.trim();
-      }
-    }
-  }
-
-  return undefined;
-}
-
 async function maybeRefineWithLlm(sourcePaper: ExtractionSourcePaper, baseExtraction: GeneEditingExtraction) {
-  const apiKey = process.env.OPENAI_API_KEY;
-
-  if (!apiKey) {
+  if (!isLlmEnabled()) {
     return baseExtraction;
   }
 
   const basePaper = resolveBasePaper(sourcePaper);
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${apiKey}`,
-    },
-    signal: AbortSignal.timeout(8_000),
-    body: JSON.stringify({
-      model: process.env.OPENAI_EXTRACTION_MODEL ?? "gpt-4o-mini",
-      input: [
-        {
-          role: "system",
-          content: [
-            {
-              type: "input_text",
-              text:
-                "You extract structured gene-editing paper facts from only the provided paper metadata. Never use outside knowledge. If a field is absent or uncertain, return exactly 'not reported'. Be especially conservative for limitations and follow-up opportunities.",
-            },
-          ],
-        },
-        {
-          role: "user",
-          content: [
-            {
-              type: "input_text",
-              text: JSON.stringify(
-                {
-                  paper: {
-                    title: sourcePaper.title,
-                    abstract: sourcePaper.abstract,
-                    journal: sourcePaper.journal,
-                    authors: sourcePaper.authors,
-                    organisms: sourcePaper.organisms,
-                    editorTypes: sourcePaper.editorTypes,
-                    publishedAt: sourcePaper.publishedAt,
-                    appPaper: basePaper
-                      ? {
-                          modality: basePaper.modality,
-                          diseaseArea: basePaper.diseaseArea,
-                          stage: basePaper.stage,
-                          geneSymbols: basePaper.geneSymbols,
-                        }
-                      : undefined,
-                  },
-                  ruleBasedExtraction: baseExtraction,
-                },
-                null,
-                2,
-              ),
-            },
-          ],
-        },
-      ],
-      text: {
-        format: {
-          type: "json_schema",
-          name: "gene_editing_extraction",
-          strict: true,
-          schema: EXTRACTION_JSON_SCHEMA,
-        },
+  const userPayload = JSON.stringify(
+    {
+      paper: {
+        title: sourcePaper.title,
+        abstract: sourcePaper.abstract,
+        journal: sourcePaper.journal,
+        authors: sourcePaper.authors,
+        organisms: sourcePaper.organisms,
+        editorTypes: sourcePaper.editorTypes,
+        publishedAt: sourcePaper.publishedAt,
+        appPaper: basePaper
+          ? {
+              modality: basePaper.modality,
+              diseaseArea: basePaper.diseaseArea,
+              stage: basePaper.stage,
+              geneSymbols: basePaper.geneSymbols,
+            }
+          : undefined,
       },
-    }),
+      ruleBasedExtraction: baseExtraction,
+    },
+    null,
+    2,
+  );
+
+  const parsed = await llmJson({
+    system:
+      "You extract structured gene-editing paper facts from only the provided paper metadata. Never use outside knowledge. If a field is absent or uncertain, return exactly 'not reported'. Be especially conservative for limitations and follow-up opportunities. Respond with a single JSON object matching the requested fields.",
+    user: `Extract the gene-editing fields as JSON from the following paper data:\n${userPayload}`,
+    schema: geneEditingExtractionSchema,
+    maxTokens: 700,
+    timeoutMs: 8_000,
   });
 
-  if (!response.ok) {
-    throw new Error(`OpenAI extraction returned ${response.status}`);
+  if (!parsed) {
+    return baseExtraction;
   }
 
-  const payload = (await response.json()) as LlmResponsePayload;
-  const outputText = getOpenAiOutputText(payload);
-
-  if (!outputText) {
-    throw new Error("OpenAI extraction returned no text");
-  }
-
-  const parsed = geneEditingExtractionSchema.parse(JSON.parse(outputText));
   const merged: GeneEditingExtraction = { ...baseExtraction };
 
   for (const field of LLM_REFINABLE_FIELDS) {
