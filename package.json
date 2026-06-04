@@ -17,13 +17,14 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "prisma db seed",
-    "db:init": "mkdir -p .tools && rm -f prisma/dev.db prisma/dev.db-journal && prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script > .tools/init.sql && sqlite3 prisma/dev.db < .tools/init.sql"
+    "db:init": "prisma db push"
   },
   "dependencies": {
     "@prisma/client": "^6.0.0",
     "@radix-ui/react-slot": "^1.1.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "fast-xml-parser": "^5.8.0",
     "lucide-react": "^0.525.0",
     "next": "^15.0.0",
     "react": "^19.0.0",
@@ -32,6 +33,7 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@netlify/functions": "^5.3.0",
     "@types/node": "^22.10.2",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",

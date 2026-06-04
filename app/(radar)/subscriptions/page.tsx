@@ -1,9 +1,11 @@
-import { BellRing, Layers3, Sparkles } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, BellRing, Layers3, Sparkles } from "lucide-react";
 
 import { getSubscriptionIntelligence } from "@/lib/literature";
 import { PageHeader } from "@/components/page-header";
 import { SubscriptionCard } from "@/components/subscription-card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,6 +20,14 @@ export default async function SubscriptionsPage() {
         eyebrow="订阅匹配"
         title="为需要持续关注的方向建立订阅规则。"
         description="当前订阅会基于关键词、作者、期刊、研究物种与编辑类型对收集到的文献进行匹配；当外部数据源不可用时，将自动回退到内置模拟数据。"
+        actions={
+          <Button asChild>
+            <Link href="/notifications">
+              订阅文献通知
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </Button>
+        }
       />
 
       <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">

@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -37,32 +37,50 @@ enum EvaluationVerdict {
   PASS
 }
 
+enum LiteratureSourceName {
+  PUBMED
+  EUROPE_PMC
+  CROSSREF
+  RSS
+  BIORXIV
+  MEDRXIV
+  OPENALEX
+  SEMANTIC_SCHOLAR
+  UNPAYWALL
+  MOCK
+}
+
+enum NotificationChannel {
+  EMAIL
+  IN_APP
+}
+
 model Journal {
-  id              String          @id @default(cuid())
-  slug            String          @unique
-  name            String          @unique
+  id              String         @id @default(cuid())
+  slug            String         @unique
+  name            String         @unique
   publisher       String
   summary         String
   impactFactor    Float
   reviewSpeedDays Int
   acceptanceRate  Float
-  openAccess      Boolean         @default(false)
+  openAccess      Boolean        @default(false)
   region          String
-  coverageScore   Int             @default(0)
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  coverageScore   Int            @default(0)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
   papers          Paper[]
   subscriptions   Subscription[]
   journalTopics   JournalTopic[]
 }
 
 model Topic {
-  id            String          @id @default(cuid())
-  slug          String          @unique
-  label         String          @unique
+  id            String         @id @default(cuid())
+  slug          String         @unique
+  label         String         @unique
   description   String
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
   papers        Paper[]
   ideas         Idea[]
   subscriptions Subscription[]
@@ -70,11 +88,11 @@ model Topic {
 }
 
 model JournalTopic {
-  journalId  String
-  topicId    String
-  createdAt  DateTime @default(now())
-  journal    Journal  @relation(fields: [journalId], references: [id], onDelete: Cascade)
-  topic      Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  journalId String
+  topicId   String
+  createdAt DateTime @default(now())
+  journal   Journal  @relation(fields: [journalId], references: [id], onDelete: Cascade)
+  topic     Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
 
   @@id([journalId, topicId])
 }
@@ -90,12 +108,12 @@ model Author {
 }
 
 model GeneTarget {
-  id            String          @id @default(cuid())
-  symbol        String          @unique
+  id            String         @id @default(cuid())
+  symbol        String         @unique
   name          String
   pathway       String
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
   papers        Paper[]
   subscriptions Subscription[]
 }
@@ -142,53 +160,55 @@ model Paper {
 }
 
 model Subscription {
-  id              String               @id @default(cuid())
-  label           String
-  cadence         SubscriptionCadence
-  signalThreshold Int
-  notes           String
-  isActive        Boolean              @default(true)
-  keywordsText    String?
-  authorNamesText String?
-  journalNamesText String?
-  organismsText   String?
-  editorTypesText String?
-  createdAt       DateTime             @default(now())
-  updatedAt       DateTime             @updatedAt
-  journalId       String?
-  journal         Journal?             @relation(fields: [journalId], references: [id], onDelete: SetNull)
-  topicId         String?
-  topic           Topic?               @relation(fields: [topicId], references: [id], onDelete: SetNull)
-  geneTargetId    String?
-  geneTarget      GeneTarget?          @relation(fields: [geneTargetId], references: [id], onDelete: SetNull)
+  id                     String                  @id @default(cuid())
+  label                  String
+  cadence                SubscriptionCadence
+  signalThreshold        Int
+  notes                  String
+  isActive               Boolean                 @default(true)
+  keywordsText           String?
+  authorNamesText        String?
+  journalNamesText       String?
+  organismsText          String?
+  editorTypesText        String?
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  journalId              String?
+  journal                Journal?                @relation(fields: [journalId], references: [id], onDelete: SetNull)
+  topicId                String?
+  topic                  Topic?                  @relation(fields: [topicId], references: [id], onDelete: SetNull)
+  geneTargetId           String?
+  geneTarget             GeneTarget?             @relation(fields: [geneTargetId], references: [id], onDelete: SetNull)
+  deliveredNotifications DeliveredNotification[]
+  subscriptionMatches    SubscriptionMatch[]
 
   @@index([isActive])
 }
 
 model Idea {
-  id        String      @id @default(cuid())
-  slug      String      @unique
-  title     String
-  thesis    String
-  customer  String
-  wedge     String
-  moat      String
-  risk      String
-  stage     IdeaStage
-  score     Int
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-  paperId   String?
-  paper     Paper?      @relation(fields: [paperId], references: [id], onDelete: SetNull)
-  topicId   String?
-  topic     Topic?      @relation(fields: [topicId], references: [id], onDelete: SetNull)
+  id          String       @id @default(cuid())
+  slug        String       @unique
+  title       String
+  thesis      String
+  customer    String
+  wedge       String
+  moat        String
+  risk        String
+  stage       IdeaStage
+  score       Int
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  paperId     String?
+  paper       Paper?       @relation(fields: [paperId], references: [id], onDelete: SetNull)
+  topicId     String?
+  topic       Topic?       @relation(fields: [topicId], references: [id], onDelete: SetNull)
   evaluations Evaluation[]
 
   @@index([score])
 }
 
 model Evaluation {
-  id             String             @id @default(cuid())
+  id             String            @id @default(cuid())
   technicalFit   Int
   marketFit      Int
   defensibility  Int
@@ -196,10 +216,109 @@ model Evaluation {
   compositeScore Int
   verdict        EvaluationVerdict
   notes          String
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
   ideaId         String?
-  idea           Idea?              @relation(fields: [ideaId], references: [id], onDelete: SetNull)
+  idea           Idea?             @relation(fields: [ideaId], references: [id], onDelete: SetNull)
 
   @@index([verdict])
+}
+
+model LiteraturePaper {
+  id                     String                   @id @default(cuid())
+  title                  String
+  normalizedTitle        String
+  abstract               String                   @default("")
+  doi                    String?                  @unique
+  pmid                   String?                  @unique
+  journal                String                   @default("")
+  authorsText            String?
+  publishedAt            DateTime?
+  sourceUrl              String?
+  organismsText          String?
+  editorTypesText        String?
+  keywordsText           String?
+  signalScore            Int                      @default(0)
+  firstSeenAt            DateTime                 @default(now())
+  lastSeenAt             DateTime                 @default(now())
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+  sourceRecords          LiteratureSourceRecord[]
+  subscriptionMatches    SubscriptionMatch[]
+  deliveredNotifications DeliveredNotification[]
+
+  @@index([publishedAt])
+  @@index([lastSeenAt])
+  @@index([signalScore])
+  @@index([normalizedTitle])
+}
+
+model LiteratureSourceRecord {
+  id             String               @id @default(cuid())
+  source         LiteratureSourceName
+  sourceRecordId String
+  sourceUrl      String?
+  fetchedAt      DateTime             @default(now())
+  rawPublishedAt DateTime?
+  paperId        String
+  paper          LiteraturePaper      @relation(fields: [paperId], references: [id], onDelete: Cascade)
+
+  @@unique([source, sourceRecordId])
+  @@index([source])
+  @@index([paperId])
+}
+
+model LiteratureSourceState {
+  id            String               @id @default(cuid())
+  source        LiteratureSourceName
+  feedUrl       String?
+  label         String?
+  cursor        String?
+  lastFetchedAt DateTime?
+  lastSuccessAt DateTime?
+  lastError     String?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  @@unique([source, feedUrl])
+  @@index([source])
+}
+
+model SubscriptionMatch {
+  id                     String          @id @default(cuid())
+  subscriptionId         String
+  paperId                String
+  matchScore             Int
+  threshold              Int
+  reasonsText            String?
+  matchedKeywordsText    String?
+  matchedAuthorsText     String?
+  matchedJournalsText    String?
+  matchedOrganismsText   String?
+  matchedEditorTypesText String?
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
+  subscription           Subscription    @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  paper                  LiteraturePaper @relation(fields: [paperId], references: [id], onDelete: Cascade)
+
+  @@unique([subscriptionId, paperId])
+  @@index([subscriptionId])
+  @@index([paperId])
+  @@index([createdAt])
+}
+
+model DeliveredNotification {
+  id             String              @id @default(cuid())
+  subscriptionId String
+  paperId        String
+  channel        NotificationChannel
+  deliveredAt    DateTime            @default(now())
+  batchKey       String?
+  subscription   Subscription        @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  paper          LiteraturePaper     @relation(fields: [paperId], references: [id], onDelete: Cascade)
+
+  @@unique([subscriptionId, paperId, channel])
+  @@index([subscriptionId])
+  @@index([paperId])
+  @@index([deliveredAt])
 }

@@ -16,6 +16,7 @@ export const navigationItems = [
   { href: "/dashboard", label: "文献雷达" },
   { href: "/papers", label: "最新文献" },
   { href: "/subscriptions", label: "订阅匹配" },
+  { href: "/notifications" as Route, label: "文献通知" },
   { href: "/analyze" as Route, label: "智能分析" },
   { href: "/ideas", label: "选题机会" },
   { href: "/evaluate", label: "选题评估" },

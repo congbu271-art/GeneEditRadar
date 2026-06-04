@@ -15,7 +15,7 @@ import {
   type GeneEditingExtraction,
 } from "@/lib/paper-extraction";
 
-export type LiteratureSource = "pubmed" | "europe-pmc" | "crossref" | "mock";
+export type LiteratureSource = "pubmed" | "europe-pmc" | "crossref" | "rss" | "mock";
 
 export type CollectedPaper = {
   id: string;
@@ -103,6 +103,7 @@ type ResolvedSubscription = RadarSubscription & {
 
 const SOURCE_PRIORITY: Record<LiteratureSource, number> = {
   mock: 0,
+  rss: 1,
   crossref: 1,
   pubmed: 2,
   "europe-pmc": 3,
@@ -923,7 +924,7 @@ export function matchPaperToSubscription(paper: CollectedPaper, rawSubscription:
   };
 }
 
-async function collectLiterature(): Promise<LiteratureCollectionResult> {
+export async function collectExternalLiterature(): Promise<LiteratureCollectionResult> {
   const results = await Promise.all([searchPubMed(), searchEuropePmc(), searchCrossref()]);
   const collected = results.flatMap((result) => result.papers);
   const deduped = dedupePapers(collected);
@@ -943,8 +944,22 @@ async function collectLiterature(): Promise<LiteratureCollectionResult> {
   }
 
   return {
-    papers: papers.map(normalizeMockPaper).sort((left, right) => right.signalScore - left.signalScore),
+    papers: [],
     sourceStatuses: results.map((result) => result.status),
+    usedFallback: false,
+  };
+}
+
+async function collectLiterature(): Promise<LiteratureCollectionResult> {
+  const externalCollection = await collectExternalLiterature();
+
+  if (externalCollection.papers.length > 0) {
+    return externalCollection;
+  }
+
+  return {
+    papers: papers.map(normalizeMockPaper).sort((left, right) => right.signalScore - left.signalScore),
+    sourceStatuses: externalCollection.sourceStatuses,
     usedFallback: true,
   };
 }

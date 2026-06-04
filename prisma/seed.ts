@@ -70,6 +70,11 @@ function toVerdict(verdict: string): EvaluationVerdict {
 }
 
 async function main() {
+  await prisma.deliveredNotification.deleteMany();
+  await prisma.subscriptionMatch.deleteMany();
+  await prisma.literatureSourceRecord.deleteMany();
+  await prisma.literatureSourceState.deleteMany();
+  await prisma.literaturePaper.deleteMany();
   await prisma.evaluation.deleteMany();
   await prisma.idea.deleteMany();
   await prisma.subscription.deleteMany();

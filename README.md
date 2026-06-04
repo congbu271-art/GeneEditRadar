@@ -10,6 +10,7 @@ GeneEditRadar is a polished MVP frontend for tracking gene-editing papers, turni
 - Literature collection via PubMed E-utilities, Europe PMC, and Crossref
 - Paper normalization plus deduplication by DOI, PMID, and normalized title
 - Subscription matching by keywords, authors, journals, organisms, and editor types
+- Netlify Scheduled Functions for persisted literature collection, RSS/TOC feed monitoring, subscription matching, and digest delivery bookkeeping when `DATABASE_URL` is configured
 - Gene-editing-specific extraction for editing tool, editor variant, editing type, organism, delivery method, target gene, target trait, editing efficiency, off-target analysis, phenotype validation, main innovation, limitations, paper type, and follow-up opportunities
 - Optional OpenAI-backed extraction refinement when `OPENAI_API_KEY` is set, with Zod validation and `"not reported"` fallback behavior for missing fields
 - Rule-based follow-up idea generation with 3-5 research ideas per seed paper across tool transfer, organism transfer, delivery optimization, editor optimization, trait application, and off-target reduction
@@ -26,7 +27,7 @@ GeneEditRadar is a polished MVP frontend for tracking gene-editing papers, turni
 - Tailwind CSS
 - shadcn/ui conventions
 - Prisma
-- SQLite for local development
+- Postgres for persisted subscription jobs
 - Node test runner + `tsx`
 
 ## Getting started
@@ -43,7 +44,7 @@ pnpm install
 cp .env.example .env
 ```
 
-3. Generate the Prisma client and initialize the local SQLite schema:
+3. Generate the Prisma client and initialize the configured database schema:
 
 ```bash
 pnpm prisma:generate
@@ -96,9 +97,29 @@ tests/
 - If the external APIs fail or return no usable records, the dashboard falls back to the seeded mock literature set.
 - Extraction never fabricates absent fields; missing values are normalized to `"not reported"` even when optional LLM refinement is enabled.
 - Research idea scoring is rule-based for now and intentionally conservative about calling an idea differentiated.
-- Prisma is ready for local persistence, but the pages are still reading runtime data directly rather than querying the database.
-- `pnpm db:init` uses the Prisma schema as the source of truth and materializes the local SQLite file through a generated SQL diff, which is the verified path for this workspace.
+- Prisma is ready for local persistence and Netlify background jobs; the public pages still read runtime/mock data so the demo remains usable without a database.
+- `pnpm db:init` uses `prisma db push` against the configured `DATABASE_URL`; skip it when running the database-optional demo.
 - `npm` scripts are also present in `package.json`, but this repo is pinned to `pnpm@11.4.0` for reproducible local verification.
+
+## Netlify 文献订阅后台
+
+The repository includes Netlify scheduled functions under `netlify/functions/`:
+
+- `collect-literature`: runs every 6 hours, collects PubMed / Europe PMC / Crossref records, and stores them in `LiteraturePaper`.
+- `collect-rss`: runs hourly, checks high-priority journal RSS / AOP feeds, and stores gene-editing records.
+- `match-subscriptions`: runs hourly, reuses `matchPaperToSubscription` to write `SubscriptionMatch` rows.
+- `send-digest`: runs daily and records email delivery de-duplication rows in `DeliveredNotification`.
+
+If `DATABASE_URL` is absent, these jobs safely skip and the app remains in demo mode. For production subscription delivery on Netlify, use an external database such as Neon or Supabase Postgres; Netlify Functions should not rely on a local SQLite file for persistent state.
+
+The default RSS seed list currently includes Nature Biotechnology, Nature Methods, and Nature Genetics AOP feeds. Add more feed URLs with `LITERATURE_RSS_FEEDS` as a comma- or newline-separated environment variable.
+
+Recommended next data sources for timely gene-editing literature tracking:
+
+1. bioRxiv / medRxiv
+2. OpenAlex
+3. Semantic Scholar
+4. Unpaywall for open-access full-text links
 
 ## 智能分析（LLM）
 
