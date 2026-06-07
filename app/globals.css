@@ -49,24 +49,41 @@ body {
 }
 
 .glass-panel {
-  background: linear-gradient(180deg, rgba(15, 23, 42, 0.9), rgba(15, 23, 42, 0.76));
-  border-color: rgba(15, 23, 42, 0.14);
-  box-shadow: 0 24px 80px -46px rgba(15, 23, 42, 0.65);
-  color: rgba(248, 250, 252, 0.96);
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(226, 232, 240, 0.9);
+  box-shadow: 0 24px 80px -48px rgba(15, 23, 42, 0.34);
+  color: hsl(var(--foreground));
   backdrop-filter: blur(20px);
 }
 
 .glass-panel .text-card-foreground,
 .glass-panel .text-foreground,
 .glass-panel .text-slate-950,
-.glass-panel .text-slate-800 {
-  color: rgba(248, 250, 252, 0.96);
+.glass-panel .text-slate-800,
+.glass-panel .text-white {
+  color: rgb(15, 23, 42);
 }
 
 .glass-panel .text-muted-foreground,
 .glass-panel .text-slate-600,
-.glass-panel .text-slate-500 {
-  color: rgba(203, 213, 225, 0.86);
+.glass-panel .text-slate-500,
+.glass-panel .text-slate-300,
+.glass-panel .text-slate-200,
+.glass-panel .text-slate-100 {
+  color: rgb(71, 85, 105);
+}
+
+.glass-panel .text-amber-100 {
+  color: rgb(146, 64, 14);
+}
+
+.glass-panel .border-white\/10 {
+  border-color: rgb(226, 232, 240);
+}
+
+.glass-panel .bg-slate-950\/30,
+.glass-panel .bg-white\/\[0\.03\] {
+  background-color: rgb(248, 250, 252);
 }
 
 .metric-grid {

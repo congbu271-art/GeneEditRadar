@@ -11,41 +11,41 @@ export function IdeaCard({ idea }: { idea: EnrichedIdea }) {
   const localized = getLocalizedIdeaCopy(idea);
 
   return (
-    <Card className="glass-panel h-full">
+    <Card className="h-full overflow-hidden border-slate-200/80 bg-white">
       <CardHeader>
         <div className="flex items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
             <Badge>{toZhIdeaStage(idea.stage)}</Badge>
             <Badge variant="secondary">{toZhIdeaType(idea.ideaType)}</Badge>
           </div>
-          <span className="font-display text-2xl text-primary">{idea.score}</span>
+          <span className="font-display text-2xl text-cyan-800">{idea.score}</span>
         </div>
-        <CardTitle className="text-2xl">{localized.title}</CardTitle>
-        <p className="text-sm leading-7 text-slate-300">{localized.thesis}</p>
+        <CardTitle className="text-2xl text-slate-950">{localized.title}</CardTitle>
+        <p className="text-sm leading-7 text-slate-600">{localized.thesis}</p>
       </CardHeader>
-      <CardContent className="grid gap-4 text-sm text-muted-foreground">
-        <div className="flex items-start gap-3 rounded-3xl border border-white/10 bg-slate-950/30 p-4">
-          <Target className="mt-0.5 h-4 w-4 flex-none text-primary" />
+      <CardContent className="grid gap-4 text-sm text-slate-500">
+        <div className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <Target className="mt-0.5 h-4 w-4 flex-none text-cyan-700" />
           <div>
-            <p className="text-foreground">优先适配团队</p>
+            <p className="font-medium text-slate-950">优先适配团队</p>
             <p className="mt-1">{localized.customer}</p>
           </div>
         </div>
-        <div className="flex items-start gap-3 rounded-3xl border border-white/10 bg-slate-950/30 p-4">
-          <Lightbulb className="mt-0.5 h-4 w-4 flex-none text-primary" />
+        <div className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <Lightbulb className="mt-0.5 h-4 w-4 flex-none text-cyan-700" />
           <div>
-            <p className="text-foreground">最低实验数据包</p>
+            <p className="font-medium text-slate-950">最低实验数据包</p>
             <p className="mt-1">{localized.wedge}</p>
           </div>
         </div>
-        <div className="flex items-start gap-3 rounded-3xl border border-white/10 bg-slate-950/30 p-4">
-          <ShieldCheck className="mt-0.5 h-4 w-4 flex-none text-primary" />
+        <div className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <ShieldCheck className="mt-0.5 h-4 w-4 flex-none text-cyan-700" />
           <div>
-            <p className="text-foreground">发表价值与风险</p>
+            <p className="font-medium text-slate-950">发表价值与风险</p>
             <p className="mt-1">{localized.moat}</p>
-            <p className="mt-2 text-xs uppercase tracking-[0.2em] text-amber-200/90">风险提示</p>
+            <p className="mt-2 text-xs font-semibold text-amber-700">风险提示</p>
             <p className="mt-1">{localized.risk}</p>
-            <p className="mt-3 text-xs uppercase tracking-[0.2em] text-muted-foreground">推荐期刊层级</p>
+            <p className="mt-3 text-xs font-semibold text-slate-500">推荐期刊层级</p>
             <p className="mt-1">{toZhJournalTier(idea.journalTierHint)}</p>
           </div>
         </div>

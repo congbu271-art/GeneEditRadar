@@ -966,7 +966,7 @@ export function AnalysisWorkbench() {
                   const feature = structuredFeatureMap.get(paper.id);
 
                   return (
-                    <Card key={paper.id} className="glass-panel">
+                    <Card key={paper.id} className={workbenchCardClass}>
                       <CardHeader>
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div className="max-w-4xl">
@@ -991,13 +991,13 @@ export function AnalysisWorkbench() {
                         </div>
                       </CardHeader>
                       <CardContent className="grid gap-5">
-                        <div className="rounded-[24px] border border-primary/20 bg-primary/10 p-4 text-sm leading-7 text-slate-100">
-                          <p className="font-medium text-white">命中原因</p>
+                        <div className="rounded-[24px] border border-cyan-200 bg-cyan-50 p-4 text-sm leading-7 text-slate-600">
+                          <p className="font-medium text-slate-950">命中原因</p>
                           <p className="mt-2">
                             {getMatchedReason(result.mode, paper, feature, index, result.detectedQueryKind)}
                           </p>
                         </div>
-                        <p className="text-sm leading-7 text-slate-300">{paper.abstract}</p>
+                        <p className="text-sm leading-7 text-slate-600">{paper.abstract}</p>
                         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                           <DetailPanel label="来源" value={paper.source} />
                           <DetailPanel label="期刊" value={paper.journal} />
@@ -1010,15 +1010,15 @@ export function AnalysisWorkbench() {
                           <DetailPanel label="研究物种" value={feature?.organism ?? NOT_REPORTED} />
                           <DetailPanel label="编辑类型" value={feature?.editingType ?? NOT_REPORTED} />
                         </div>
-                        <div className="rounded-[28px] border border-white/10 bg-slate-950/30 p-5">
+                        <div className={panelClass}>
                           <div className="flex flex-wrap items-center gap-2">
                             <ReliabilityBadge label={feature?.reliabilityLabel ?? "规则解析"} />
                             <Badge variant="secondary">{feature?.editingTool ?? NOT_REPORTED}</Badge>
                             <Badge variant="secondary">{feature?.organism ?? NOT_REPORTED}</Badge>
                             <Badge variant="secondary">{feature?.editingType ?? NOT_REPORTED}</Badge>
                           </div>
-                          <div className="mt-4 rounded-[20px] border border-white/10 bg-white/[0.03] p-4 text-sm leading-7 text-slate-300">
-                            <p className="font-medium text-white">作者</p>
+                          <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 text-sm leading-7 text-slate-600">
+                            <p className="font-medium text-slate-950">作者</p>
                             <p className="mt-2">{paper.authors.join(", ")}</p>
                           </div>
                         </div>
@@ -1028,7 +1028,7 @@ export function AnalysisWorkbench() {
                 })}
               </section>
             ) : (
-              <Card className="glass-panel">
+              <Card className={workbenchCardClass}>
                 <CardContent className="flex min-h-48 items-center justify-center text-center text-sm leading-7 text-muted-foreground">
                   未找到足够相关的文献，请尝试更具体的关键词
                 </CardContent>
@@ -1037,7 +1037,7 @@ export function AnalysisWorkbench() {
           ) : null}
 
           {activeTab === "overview" ? (
-            <Card className="glass-panel">
+            <Card className={workbenchCardClass}>
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <ReliabilityBadge label="规则解析" />
@@ -1047,8 +1047,8 @@ export function AnalysisWorkbench() {
               </CardHeader>
               <CardContent className="grid gap-4">
                 <div className="grid gap-3 md:grid-cols-2">
-                  <div className="rounded-[24px] border border-white/10 bg-slate-950/30 p-4">
-                    <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">主要编辑工具</p>
+                  <div className={panelClass}>
+                    <p className="text-xs font-semibold text-slate-500">主要编辑工具</p>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {overviewTools.length > 0 ? (
                         overviewTools.map((tool) => (
@@ -1061,8 +1061,8 @@ export function AnalysisWorkbench() {
                       )}
                     </div>
                   </div>
-                  <div className="rounded-[24px] border border-white/10 bg-slate-950/30 p-4">
-                    <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">主要研究物种</p>
+                  <div className={panelClass}>
+                    <p className="text-xs font-semibold text-slate-500">主要研究物种</p>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {overviewOrganisms.length > 0 ? (
                         overviewOrganisms.map((organism) => (
@@ -1076,7 +1076,7 @@ export function AnalysisWorkbench() {
                     </div>
                   </div>
                 </div>
-                <div className="rounded-[28px] border border-white/10 bg-slate-950/30 p-5 text-sm leading-8 text-slate-300 whitespace-pre-line">
+                <div className="whitespace-pre-line rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm leading-8 text-slate-600">
                   {result.fieldOverview}
                 </div>
               </CardContent>
@@ -1086,7 +1086,7 @@ export function AnalysisWorkbench() {
           {activeTab === "ideas" ? (
             <section className="grid gap-6">
               {result.ideas.map((idea) => (
-                <Card key={idea.id} className="glass-panel">
+                <Card key={idea.id} className={workbenchCardClass}>
                   <CardHeader>
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="max-w-4xl">
@@ -1098,9 +1098,9 @@ export function AnalysisWorkbench() {
                         <CardTitle className="mt-4 text-2xl">{idea.name}</CardTitle>
                         <p className="mt-2 text-sm text-muted-foreground">基于文献：{idea.basedOnPapers.join("；")}</p>
                       </div>
-                      <div className="rounded-3xl border border-primary/20 bg-primary/10 px-4 py-3 text-center">
-                        <p className="font-display text-3xl text-primary">{idea.publicationPotential}</p>
-                        <p className="text-xs uppercase tracking-[0.2em] text-primary/80">发表潜力</p>
+                      <div className="rounded-3xl border border-cyan-200 bg-cyan-50 px-4 py-3 text-center">
+                        <p className="font-display text-3xl text-cyan-700">{idea.publicationPotential}</p>
+                        <p className="text-xs uppercase tracking-[0.2em] text-cyan-700/80">发表潜力</p>
                       </div>
                     </div>
                   </CardHeader>
@@ -1113,16 +1113,16 @@ export function AnalysisWorkbench() {
                       <DetailPanel label="优先级" value={idea.priority} />
                       <DetailPanel label="推荐期刊层级" value={idea.suggestedJournalTier} />
                     </div>
-                    <div className="rounded-[24px] border border-white/10 bg-slate-950/30 p-4 text-sm leading-7 text-slate-300">
-                      <p className="font-medium text-white">创新逻辑</p>
+                    <div className={panelClass}>
+                      <p className="font-medium text-slate-950">创新逻辑</p>
                       <p className="mt-2">{idea.innovationLogic}</p>
                     </div>
-                    <div className="rounded-[24px] border border-white/10 bg-slate-950/30 p-4 text-sm leading-7 text-slate-300">
-                      <p className="font-medium text-white">可行性风险</p>
+                    <div className={panelClass}>
+                      <p className="font-medium text-slate-950">可行性风险</p>
                       <p className="mt-2">{idea.feasibilityRisk}</p>
                     </div>
-                    <div className="rounded-[24px] border border-white/10 bg-slate-950/30 p-4 text-sm leading-7 text-slate-300">
-                      <p className="font-medium text-white">可行性依据</p>
+                    <div className={panelClass}>
+                      <p className="font-medium text-slate-950">可行性依据</p>
                       <p className="mt-2">{idea.feasibilityRationale}</p>
                     </div>
                     <ScoreBars
@@ -1134,12 +1134,12 @@ export function AnalysisWorkbench() {
                       ]}
                     />
                     <div className="grid gap-3">
-                      <p className="font-display text-xl text-white">最低实验数据包</p>
+                      <p className="font-display text-xl text-slate-950">最低实验数据包</p>
                       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                         {idea.minimumExperimentPackage.map((item) => (
                           <div
                             key={item}
-                            className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4 text-sm leading-7 text-slate-300"
+                            className="rounded-2xl border border-slate-200 bg-white p-4 text-sm leading-7 text-slate-600"
                           >
                             {item}
                           </div>
@@ -1148,11 +1148,11 @@ export function AnalysisWorkbench() {
                     </div>
                     {idea.riskWarnings.length > 0 ? (
                       <div className="grid gap-3">
-                        <p className="font-display text-xl text-white">风险提示</p>
+                        <p className="font-display text-xl text-slate-950">风险提示</p>
                         {idea.riskWarnings.map((warning) => (
                           <div
                             key={warning}
-                            className="rounded-[24px] border border-amber-300/25 bg-amber-300/10 p-4 text-sm leading-7 text-amber-100"
+                            className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-7 text-amber-800"
                           >
                             {warning}
                           </div>
@@ -1160,7 +1160,7 @@ export function AnalysisWorkbench() {
                       </div>
                     ) : null}
                     {idea.warning ? (
-                      <div className="rounded-[24px] border border-amber-300/25 bg-amber-300/10 p-4 text-sm leading-7 text-amber-100">
+                      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-7 text-amber-800">
                         {idea.warning}
                       </div>
                     ) : null}
@@ -1171,14 +1171,14 @@ export function AnalysisWorkbench() {
           ) : null}
 
           {activeTab === "evaluation" ? (
-            <Card className="glass-panel">
+            <Card className={workbenchCardClass}>
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <ReliabilityBadge label={result.evaluation.reliabilityLabel} />
                   <Badge variant="secondary">主选题评估</Badge>
                 </div>
                 <CardTitle className="text-3xl">{result.evaluation.targetIdeaName}</CardTitle>
-                <p className="text-sm leading-7 text-slate-300">
+                <p className="text-sm leading-7 text-slate-600">
                   下列分数用于快速判断该方向是否值得继续投入实验设计与投稿准备，分数越高代表整体可推进性越强。
                 </p>
               </CardHeader>
@@ -1202,27 +1202,27 @@ export function AnalysisWorkbench() {
                   <DetailPanel label="推荐期刊层级" value={result.evaluation.journalTier} />
                 </div>
                 {result.evaluation.warning ? (
-                  <div className="rounded-[24px] border border-amber-300/25 bg-amber-300/10 p-4 text-sm leading-7 text-amber-100">
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-7 text-amber-800">
                     {result.evaluation.warning}
                   </div>
                 ) : null}
                 {result.evaluation.lowNoveltyWarning ? (
-                  <div className="rounded-[24px] border border-rose-300/25 bg-rose-300/10 p-4 text-sm leading-7 text-rose-100">
+                  <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm leading-7 text-rose-700">
                     {result.evaluation.lowNoveltyWarning}
                   </div>
                 ) : null}
                 <div className="grid gap-3">
-                  <p className="font-display text-xl text-white">建议补充实验</p>
+                  <p className="font-display text-xl text-slate-950">建议补充实验</p>
                   {result.evaluation.additionalExperiments.map((item) => (
-                    <div key={item} className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4 text-sm leading-7 text-slate-300">
+                    <div key={item} className="rounded-2xl border border-slate-200 bg-white p-4 text-sm leading-7 text-slate-600">
                       {item}
                     </div>
                   ))}
                 </div>
                 <div className="grid gap-3">
-                  <p className="font-display text-xl text-white">评分依据</p>
+                  <p className="font-display text-xl text-slate-950">评分依据</p>
                   {result.evaluation.rationale.map((item) => (
-                    <div key={item} className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4 text-sm leading-7 text-slate-300">
+                    <div key={item} className="rounded-2xl border border-slate-200 bg-white p-4 text-sm leading-7 text-slate-600">
                       {item}
                     </div>
                   ))}
@@ -1233,12 +1233,12 @@ export function AnalysisWorkbench() {
 
           {activeTab === "journals" ? (
             <section className="grid gap-6">
-              <div className="rounded-[24px] border border-amber-300/25 bg-amber-300/10 p-4 text-sm leading-7 text-amber-100">
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-7 text-amber-800">
                 期刊建议为启发式判断，不代表投稿保证；实际投稿需结合完整数据质量、期刊 scope 和审稿偏好。
               </div>
               <div className="grid gap-6 lg:grid-cols-2">
                 {result.journalSuggestions.map((suggestion) => (
-                  <Card key={suggestion.journalTier} className="glass-panel">
+                  <Card key={suggestion.journalTier} className={workbenchCardClass}>
                     <CardHeader>
                       <div className="flex items-center gap-2">
                         <ReliabilityBadge label={suggestion.reliabilityLabel} />
@@ -1247,9 +1247,9 @@ export function AnalysisWorkbench() {
                       <CardTitle className="text-2xl">{suggestion.journalTier}</CardTitle>
                     </CardHeader>
                     <CardContent className="grid gap-4">
-                      <p className="text-sm leading-7 text-slate-300">{suggestion.rationale}</p>
+                      <p className="text-sm leading-7 text-slate-600">{suggestion.rationale}</p>
                       <div className="grid gap-3">
-                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">示例期刊</p>
+                        <p className="text-xs font-semibold text-slate-500">示例期刊</p>
                         <div className="flex flex-wrap gap-2">
                           {suggestion.exampleJournals.length > 0 ? (
                             suggestion.exampleJournals.map((journal) => (
