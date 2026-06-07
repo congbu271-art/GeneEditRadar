@@ -90,6 +90,11 @@ const resultTabs = [
   { id: "journals", label: "期刊建议" },
 ] as const;
 
+const workbenchCardClass = "overflow-hidden border-slate-200/80 bg-white";
+const panelClass = "rounded-2xl border border-slate-200 bg-slate-50 p-4";
+const accentPanelClass = "rounded-2xl border border-cyan-200 bg-cyan-50 p-4";
+const softPanelClass = "rounded-2xl border border-slate-200 bg-white p-4";
+
 type ResultTabId = (typeof resultTabs)[number]["id"];
 
 export function getDefaultResultTab(mode: AnalyzeMode): ResultTabId {
@@ -402,21 +407,21 @@ function ScorePanel({ label, value, accent = false }: { label: string; value: nu
   return (
     <div
       className={cn(
-        "rounded-[24px] border p-4",
-        accent ? "border-primary/25 bg-primary/10" : "border-white/10 bg-slate-950/30",
+        "rounded-2xl border p-4",
+        accent ? "border-cyan-200 bg-cyan-50" : "border-slate-200 bg-slate-50",
       )}
     >
-      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{label}</p>
-      <p className={cn("mt-3 font-display text-3xl", accent ? "text-primary" : "text-white")}>{value}</p>
+      <p className="text-xs font-semibold text-slate-500">{label}</p>
+      <p className={cn("mt-3 font-display text-3xl", accent ? "text-cyan-800" : "text-slate-950")}>{value}</p>
     </div>
   );
 }
 
 function DetailPanel({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[20px] border border-white/10 bg-white/[0.03] p-4 text-sm">
-      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{label}</p>
-      <p className="mt-2 break-words text-white">{value}</p>
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm">
+      <p className="text-xs font-semibold text-slate-500">{label}</p>
+      <p className="mt-2 break-words text-slate-950">{value}</p>
     </div>
   );
 }
@@ -453,14 +458,14 @@ function getTransferPathIdea(result: AnalyzeResponse, label: string) {
 
 function EmptyResultState() {
   return (
-    <Card className="glass-panel">
+    <Card className={workbenchCardClass}>
       <CardContent className="flex min-h-48 flex-col items-center justify-center gap-4 text-center">
-        <div className="rounded-full border border-primary/20 bg-primary/10 p-4 text-primary">
+        <div className="rounded-full border border-cyan-200 bg-cyan-50 p-4 text-cyan-700">
           <Sparkles className="h-6 w-6" />
         </div>
         <div>
-          <p className="font-display text-2xl text-white">等待分析输入</p>
-          <p className="mt-2 text-sm leading-7 text-muted-foreground">
+          <p className="font-display text-2xl text-slate-950">等待分析输入</p>
+          <p className="mt-2 text-sm leading-7 text-slate-500">
             请输入关键词、研究方向、文献标题、DOI 或 PMID，系统会返回结构化的分析结果。
           </p>
         </div>
@@ -580,14 +585,14 @@ export function AnalysisWorkbench() {
       />
 
       <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-        <Card className="glass-panel">
+        <Card className={workbenchCardClass}>
           <CardHeader>
             <div className="flex flex-wrap items-center gap-2">
               <Badge>分析入口</Badge>
               <Badge variant="secondary">中文学术工作流</Badge>
             </div>
-            <CardTitle className="text-3xl">输入研究问题</CardTitle>
-            <p className="text-sm leading-7 text-slate-300">{modeConfig.description}</p>
+            <CardTitle className="text-3xl text-slate-950">输入研究问题</CardTitle>
+            <p className="text-sm leading-7 text-slate-600">{modeConfig.description}</p>
           </CardHeader>
           <CardContent className="grid gap-5">
             <div className="grid gap-3 sm:grid-cols-2">
@@ -597,20 +602,20 @@ export function AnalysisWorkbench() {
                   type="button"
                   onClick={() => setMode(option.value)}
                   className={cn(
-                    "rounded-[28px] border p-4 text-left transition-all",
+                    "rounded-2xl border p-4 text-left transition-all",
                     mode === option.value
-                      ? "border-primary/30 bg-primary/10 shadow-glow"
-                      : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]",
+                      ? "border-cyan-300 bg-cyan-50 shadow-[0_16px_42px_-30px_rgba(14,116,144,0.75)]"
+                      : "border-slate-200 bg-slate-50 hover:border-cyan-200 hover:bg-cyan-50/60",
                   )}
                 >
-                  <p className="font-display text-lg text-white">{option.label}</p>
-                  <p className="mt-2 text-sm leading-7 text-muted-foreground">{option.description}</p>
+                  <p className="font-display text-lg text-slate-950">{option.label}</p>
+                  <p className="mt-2 text-sm leading-7 text-slate-500">{option.description}</p>
                 </button>
               ))}
             </div>
 
             <div className="grid gap-3">
-              <label htmlFor="analysis-query" className="text-sm font-medium text-foreground">
+              <label htmlFor="analysis-query" className="text-sm font-medium text-slate-700">
                 分析输入
               </label>
               <Textarea
@@ -621,21 +626,21 @@ export function AnalysisWorkbench() {
                 className="min-h-40"
               />
               {mode === "paper" ? (
-                <p className="text-xs leading-6 text-muted-foreground">
+                <p className="text-xs leading-6 text-slate-500">
                   文献模式下可直接输入文献标题、DOI 或 PMID；未精确匹配时会返回最接近的候选文献。
                 </p>
               ) : null}
             </div>
 
             <div className="grid gap-3">
-              <p className="text-sm font-medium text-foreground">示例查询</p>
+              <p className="text-sm font-medium text-slate-700">示例查询</p>
               <div className="flex flex-wrap gap-2">
                 {exampleQueries.map((example) => (
                   <button
                     key={example}
                     type="button"
                     onClick={() => setQuery(example)}
-                    className="rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-white/[0.08] hover:text-foreground"
+                    className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 transition-colors hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-800"
                   >
                     {example}
                   </button>
@@ -655,14 +660,14 @@ export function AnalysisWorkbench() {
             </Button>
 
             {error ? (
-              <div className="rounded-[24px] border border-rose-300/25 bg-rose-300/10 p-4 text-sm leading-7 text-rose-100">
+              <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm leading-7 text-rose-700">
                 {error}
               </div>
             ) : null}
           </CardContent>
         </Card>
 
-        <Card className="glass-panel">
+        <Card className={workbenchCardClass}>
           <CardHeader>
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="secondary">分析流程</Badge>
@@ -671,7 +676,7 @@ export function AnalysisWorkbench() {
               <ReliabilityBadge label="启发式评分" />
               <ReliabilityBadge label="AI生成假设" />
             </div>
-            <CardTitle className="text-3xl">输出结构与可靠性标签</CardTitle>
+            <CardTitle className="text-3xl text-slate-950">输出结构与可靠性标签</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4">
             {workflowSteps.map((step, index) => {
@@ -691,10 +696,10 @@ export function AnalysisWorkbench() {
                     : "该步骤的结果已写入当前分析视图，可在下方标签页继续查看。";
 
               return (
-                <div key={step.idleLabel} className="rounded-[26px] border border-white/10 bg-slate-950/30 p-4">
+                <div key={step.idleLabel} className={panelClass}>
                   <div className="flex items-center justify-between gap-3">
-                    <p className={cn("font-medium", isActive || isCompleted ? "text-white" : "text-slate-200")}>{title}</p>
-                    {isActive ? <LoaderCircle className="h-4 w-4 animate-spin text-primary" /> : null}
+                    <p className={cn("font-medium", isActive || isCompleted ? "text-slate-950" : "text-slate-700")}>{title}</p>
+                    {isActive ? <LoaderCircle className="h-4 w-4 animate-spin text-cyan-700" /> : null}
                     {isCompleted ? (
                       <Badge variant="success" className="gap-1">
                         <CheckCircle2 className="h-3.5 w-3.5" />
@@ -702,8 +707,8 @@ export function AnalysisWorkbench() {
                       </Badge>
                     ) : null}
                   </div>
-                  <p className="mt-2 text-sm leading-7 text-muted-foreground">{description}</p>
-                  <div className="mt-3 h-2 rounded-full bg-white/8">
+                  <p className="mt-2 text-sm leading-7 text-slate-500">{description}</p>
+                  <div className="mt-3 h-2 rounded-full bg-slate-200">
                     <div
                       className={cn(
                         "h-full rounded-full transition-all",
@@ -711,7 +716,7 @@ export function AnalysisWorkbench() {
                           ? "w-full bg-[linear-gradient(90deg,rgba(34,211,238,0.95),rgba(52,211,153,0.92))]"
                           : isCompleted
                             ? "w-full bg-[linear-gradient(90deg,rgba(74,222,128,0.92),rgba(45,212,191,0.9))]"
-                            : "w-1/3 bg-white/12",
+                            : "w-1/3 bg-slate-300",
                       )}
                     />
                   </div>
@@ -719,8 +724,8 @@ export function AnalysisWorkbench() {
               );
             })}
 
-            <div className="rounded-[28px] border border-white/10 bg-white/[0.03] p-5 text-sm leading-7 text-slate-300">
-              <p className="font-display text-xl text-white">结果说明</p>
+            <div className="rounded-2xl border border-cyan-100 bg-cyan-50/70 p-5 text-sm leading-7 text-slate-600">
+              <p className="font-display text-xl text-slate-950">结果说明</p>
               <p className="mt-2">
                 相关结论会尽量标注来源类型。文献信息属于“元数据”，字段提取属于“规则解析”，评分与期刊层级属于“启发式评分”，
                 衍生选题属于“AI生成假设”。
@@ -731,13 +736,13 @@ export function AnalysisWorkbench() {
       </section>
 
       {isLoading ? (
-        <Card className="glass-panel">
+        <Card className={workbenchCardClass}>
           <CardContent className="grid gap-4 p-6">
             <div className="flex items-center gap-3">
-              <LoaderCircle className="h-5 w-5 animate-spin text-primary" />
-              <p className="font-display text-2xl text-white">{loadingSteps[loadingStepIndex]}</p>
+              <LoaderCircle className="h-5 w-5 animate-spin text-cyan-700" />
+              <p className="font-display text-2xl text-slate-950">{loadingSteps[loadingStepIndex]}</p>
             </div>
-            <p className="text-sm leading-7 text-muted-foreground">
+            <p className="text-sm leading-7 text-slate-500">
               系统会依次聚合文献、解析基因编辑字段、生成衍生选题，并给出可发表性与期刊层级建议。
             </p>
           </CardContent>
@@ -747,7 +752,7 @@ export function AnalysisWorkbench() {
       {result ? (
         <>
           <section className="grid gap-6 xl:grid-cols-[1fr_0.95fr]">
-            <Card className="glass-panel">
+            <Card className={workbenchCardClass}>
               <CardHeader>
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge>分析结果</Badge>
@@ -756,17 +761,17 @@ export function AnalysisWorkbench() {
                   ) : null}
                   {result.usedFallback ? <Badge variant="warning">已启用本地模拟文献回退</Badge> : null}
                 </div>
-                <CardTitle className="text-3xl">查询摘要</CardTitle>
-                <p className="text-sm leading-7 text-slate-300">
+                <CardTitle className="text-3xl text-slate-950">查询摘要</CardTitle>
+                <p className="text-sm leading-7 text-slate-600">
                   {result.mode === "keyword"
                     ? "系统已基于该方向聚合相关文献，并形成领域概览、衍生选题与投稿建议。"
                     : "系统已围绕该种子文献生成相关文献集、结构化字段解析与选题评估。"}
                 </p>
               </CardHeader>
               <CardContent className="grid gap-4">
-                <div className="rounded-[26px] border border-white/10 bg-slate-950/30 p-4">
-                  <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">查询关键词</p>
-                  <p className="mt-2 font-display text-2xl text-white break-words">{result.query}</p>
+                <div className={accentPanelClass}>
+                  <p className="text-xs font-semibold text-cyan-700">查询关键词</p>
+                  <p className="mt-2 break-words font-display text-2xl text-cyan-950">{result.query}</p>
                 </div>
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
                   <ScorePanel label="找到相关文献" value={`${result.papers.length} 篇`} accent />
@@ -777,7 +782,7 @@ export function AnalysisWorkbench() {
                   <ScorePanel label="竞争风险" value={result.evaluation.competitionRisk} />
                 </div>
                 {result.warnings.length > 0 ? (
-                  <div className="grid gap-3 rounded-[28px] border border-amber-300/25 bg-amber-300/10 p-4 text-sm leading-7 text-amber-100">
+                  <div className="grid gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-7 text-amber-800">
                     {result.warnings.map((warning) => (
                       <div key={warning}>{warning}</div>
                     ))}
@@ -786,21 +791,21 @@ export function AnalysisWorkbench() {
               </CardContent>
             </Card>
 
-            <Card className="glass-panel">
+            <Card className={workbenchCardClass}>
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <Badge variant="secondary">数据源状态</Badge>
                   <ReliabilityBadge label="元数据" />
                 </div>
-                <CardTitle className="text-3xl">检索来源</CardTitle>
+                <CardTitle className="text-3xl text-slate-950">检索来源</CardTitle>
               </CardHeader>
               <CardContent className="grid gap-3">
                 {result.usedFallback ? (
-                  <div className="rounded-[24px] border border-amber-300/25 bg-amber-300/10 p-4 text-sm leading-7 text-amber-100">
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-7 text-amber-800">
                     当前结果基于本地示例数据生成，后续接入真实文献源后可进一步更新。
                   </div>
                 ) : result.sourceStatuses.length > 0 ? (
-                  <div className="rounded-[24px] border border-sky-300/20 bg-sky-300/10 p-4 text-sm leading-7 text-sky-100">
+                  <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm leading-7 text-sky-800">
                     当前结果已综合 {result.sourceStatuses.map((status) => status.source).join("、")} 等文献源。
                   </div>
                 ) : null}
@@ -808,11 +813,11 @@ export function AnalysisWorkbench() {
                   result.sourceStatuses.map((status) => (
                     <div
                       key={status.source}
-                      className="flex flex-wrap items-center justify-between gap-3 rounded-[24px] border border-white/10 bg-slate-950/30 p-4 text-sm"
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm"
                     >
                       <div>
-                        <p className="font-medium text-white">{status.source}</p>
-                        <p className="mt-1 text-muted-foreground">
+                        <p className="font-medium text-slate-950">{status.source}</p>
+                        <p className="mt-1 text-slate-500">
                           {status.ok ? `已返回 ${status.count} 条候选记录` : status.error ?? "检索失败"}
                         </p>
                       </div>
@@ -820,7 +825,7 @@ export function AnalysisWorkbench() {
                     </div>
                   ))
                 ) : (
-                  <div className="rounded-[24px] border border-white/10 bg-slate-950/30 p-4 text-sm leading-7 text-muted-foreground">
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-7 text-slate-500">
                     当前响应未提供额外数据源状态，结果已按核心分析字段完成渲染。
                   </div>
                 )}
@@ -830,45 +835,45 @@ export function AnalysisWorkbench() {
 
           {result.mode === "paper" ? result.paperStrategySummary ? (
             <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-              <Card className="glass-panel">
+              <Card className={workbenchCardClass}>
                 <CardHeader>
                   <div className="flex items-center gap-2">
                     <ReliabilityBadge label="规则解析" />
                     <Badge variant="secondary">文献策略解读</Badge>
                   </div>
-                  <CardTitle className="text-3xl">文献策略解读</CardTitle>
+                  <CardTitle className="text-3xl text-slate-950">文献策略解读</CardTitle>
                 </CardHeader>
                 <CardContent className="grid gap-4">
                   <div className="grid gap-4 md:grid-cols-2">
-                    <div className="rounded-[24px] border border-white/10 bg-slate-950/30 p-4">
-                      <p className="text-sm font-medium text-white">研究整体思路</p>
-                      <p className="mt-3 text-sm leading-7 text-slate-300">{result.paperStrategySummary.overallStrategy}</p>
+                    <div className={panelClass}>
+                      <p className="text-sm font-medium text-slate-950">研究整体思路</p>
+                      <p className="mt-3 text-sm leading-7 text-slate-600">{result.paperStrategySummary.overallStrategy}</p>
                     </div>
-                    <div className="rounded-[24px] border border-white/10 bg-slate-950/30 p-4">
-                      <p className="text-sm font-medium text-white">为什么这篇文章能够发表</p>
-                      <p className="mt-3 text-sm leading-7 text-slate-300">{result.paperStrategySummary.whyPublishable}</p>
+                    <div className={panelClass}>
+                      <p className="text-sm font-medium text-slate-950">为什么这篇文章能够发表</p>
+                      <p className="mt-3 text-sm leading-7 text-slate-600">{result.paperStrategySummary.whyPublishable}</p>
                     </div>
                   </div>
-                  <div className="rounded-[24px] border border-primary/20 bg-primary/10 p-4">
-                    <p className="text-sm font-medium text-white">核心创新点</p>
-                    <p className="mt-3 text-sm leading-7 text-slate-100">{result.paperStrategySummary.coreInnovation}</p>
+                  <div className={accentPanelClass}>
+                    <p className="text-sm font-medium text-cyan-950">核心创新点</p>
+                    <p className="mt-3 text-sm leading-7 text-cyan-950/80">{result.paperStrategySummary.coreInnovation}</p>
                   </div>
                   <div className="grid gap-4 md:grid-cols-2">
-                    <div className="rounded-[24px] border border-white/10 bg-slate-950/30 p-4">
-                      <p className="text-sm font-medium text-white">证据链</p>
+                    <div className={panelClass}>
+                      <p className="text-sm font-medium text-slate-950">证据链</p>
                       <div className="mt-3 grid gap-3">
                         {result.paperStrategySummary.evidenceChain.map((item) => (
-                          <div key={item} className="rounded-[18px] border border-white/10 bg-white/[0.03] p-3 text-sm leading-7 text-slate-300">
+                          <div key={item} className="rounded-xl border border-slate-200 bg-white p-3 text-sm leading-7 text-slate-600">
                             {item}
                           </div>
                         ))}
                       </div>
                     </div>
-                    <div className="rounded-[24px] border border-white/10 bg-slate-950/30 p-4">
-                      <p className="text-sm font-medium text-white">局限性</p>
+                    <div className={panelClass}>
+                      <p className="text-sm font-medium text-slate-950">局限性</p>
                       <div className="mt-3 grid gap-3">
                         {result.paperStrategySummary.limitations.map((item) => (
-                          <div key={item} className="rounded-[18px] border border-white/10 bg-white/[0.03] p-3 text-sm leading-7 text-slate-300">
+                          <div key={item} className="rounded-xl border border-slate-200 bg-white p-3 text-sm leading-7 text-slate-600">
                             {item}
                           </div>
                         ))}
@@ -878,13 +883,13 @@ export function AnalysisWorkbench() {
                 </CardContent>
               </Card>
 
-              <Card className="glass-panel">
+              <Card className={workbenchCardClass}>
                 <CardHeader>
                   <div className="flex items-center gap-2">
                     <ReliabilityBadge label="规则解析" />
                     <Badge variant="secondary">最优衍生方向</Badge>
                   </div>
-                  <CardTitle className="text-3xl">最优衍生方向</CardTitle>
+                  <CardTitle className="text-3xl text-slate-950">最优衍生方向</CardTitle>
                 </CardHeader>
                 <CardContent className="grid gap-4">
                   {result.technologyTransferPaths && result.technologyTransferPaths.length > 0 ? (
@@ -892,27 +897,27 @@ export function AnalysisWorkbench() {
                       const transferIdea = getTransferPathIdea(result, path.label);
 
                       return (
-                      <div key={path.path} className="rounded-[24px] border border-white/10 bg-slate-950/30 p-4">
+                      <div key={path.path} className={panelClass}>
                         <div className="flex flex-wrap items-center gap-2">
                           <Badge>{path.label}</Badge>
                           <Badge variant={path.priority === "高" ? "success" : path.priority === "中" ? "warning" : "secondary"}>
                             {path.priority}优先级
                           </Badge>
                         </div>
-                        <p className="mt-3 text-sm leading-7 text-slate-300">{path.rationale}</p>
+                        <p className="mt-3 text-sm leading-7 text-slate-600">{path.rationale}</p>
                         {transferIdea ? (
                           <div className="mt-4 grid gap-3">
-                            <div className="rounded-[18px] border border-primary/20 bg-primary/10 p-3 text-sm leading-7 text-slate-100">
-                              <p className="font-medium text-white">优先建议继续做的体系</p>
+                            <div className="rounded-xl border border-cyan-200 bg-cyan-50 p-3 text-sm leading-7 text-cyan-950/80">
+                              <p className="font-medium text-cyan-950">优先建议继续做的体系</p>
                               <p className="mt-2">{transferIdea.name}</p>
                             </div>
-                            <div className="rounded-[18px] border border-white/10 bg-white/[0.03] p-3 text-sm leading-7 text-slate-300">
-                              <p className="font-medium text-white">为什么这个方向可行</p>
+                            <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm leading-7 text-slate-600">
+                              <p className="font-medium text-slate-950">为什么这个方向可行</p>
                               <p className="mt-2">{transferIdea.feasibilityRationale}</p>
                             </div>
                             <div className="grid gap-3 md:grid-cols-2">
                               {transferIdea.minimumExperimentPackage.slice(0, 2).map((item) => (
-                                <div key={item} className="rounded-[18px] border border-white/10 bg-white/[0.03] p-3 text-sm leading-7 text-slate-300">
+                                <div key={item} className="rounded-xl border border-slate-200 bg-white p-3 text-sm leading-7 text-slate-600">
                                   {item}
                                 </div>
                               ))}
@@ -923,7 +928,7 @@ export function AnalysisWorkbench() {
                       );
                     })
                   ) : (
-                    <div className="rounded-[24px] border border-white/10 bg-slate-950/30 p-4 text-sm leading-7 text-muted-foreground">
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-7 text-slate-500">
                       当前未形成明确的技术迁移路径，建议结合更多上下游文献再判断最优衍生方向。
                     </div>
                   )}
@@ -931,7 +936,7 @@ export function AnalysisWorkbench() {
               </Card>
             </section>
           ) : (
-            <div className="rounded-[24px] border border-amber-300/25 bg-amber-300/10 p-4 text-sm leading-7 text-amber-100">
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-7 text-amber-800">
               当前结果缺少文献策略解读，请检查 /api/analyze 的 paper-mode 返回结构。
             </div>
           ) : null}
@@ -945,8 +950,8 @@ export function AnalysisWorkbench() {
                 className={cn(
                   "rounded-full border px-4 py-2 text-sm font-medium transition-colors",
                   activeTab === tab.id
-                    ? "border-primary/30 bg-primary/15 text-primary"
-                    : "border-white/10 bg-white/[0.03] text-muted-foreground hover:bg-white/[0.06] hover:text-foreground",
+                    ? "border-cyan-300 bg-cyan-50 text-cyan-800"
+                    : "border-slate-200 bg-white text-slate-600 hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-800",
                 )}
               >
                 {tab.label}
