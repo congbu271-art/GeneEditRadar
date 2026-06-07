@@ -19,10 +19,10 @@ export function NavLink({ href, label }: NavLinkProps) {
     <Link
       href={href}
       className={cn(
-        "rounded-2xl px-4 py-3 text-sm font-medium transition-colors",
+        "flex-1 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
         active
-          ? "bg-primary/15 text-primary shadow-[inset_0_0_0_1px_rgba(34,211,238,0.2)]"
-          : "text-muted-foreground hover:bg-white/5 hover:text-foreground",
+          ? "bg-cyan-50 text-cyan-800 shadow-[inset_0_0_0_1px_rgba(103,232,249,0.55)]"
+          : "text-slate-600 hover:bg-slate-100 hover:text-slate-950",
       )}
     >
       {label}
