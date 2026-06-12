@@ -11,7 +11,6 @@ import {
   dedupePapers,
   normalizeDoi,
   normalizePmid,
-  normalizeTitle,
   type CollectedPaper,
   type LiteratureSource,
 } from "@/lib/literature";
@@ -56,9 +55,11 @@ import {
   canonicalizeJournal,
   coerceIsoDate,
   createCollectedPaper,
+  DISPLAY_NOT_REPORTED,
   fetchJson,
   inferEditorTypes,
   inferOrganisms,
+  normalizeTitle,
   normalizeWhitespace,
   parseAuthorList,
   parseCrossrefDate,
@@ -81,8 +82,6 @@ export type {
   TechnologyTransferPath,
   TechnologyTransferPathSummary,
 } from "@/lib/analyze-types";
-
-export const ANALYZE_NOT_REPORTED = "未报道";
 
 type SourceStatus = {
   source: Exclude<LiteratureSource, "mock">;
@@ -788,7 +787,7 @@ function buildRelatedKeywordFromPaper(paper: CollectedPaper, extraction: GeneEdi
 
 function localizeReportedValue(value?: string) {
   if (!value || value === NOT_REPORTED) {
-    return ANALYZE_NOT_REPORTED;
+    return DISPLAY_NOT_REPORTED;
   }
 
   return toZhExtractionValue(value);
@@ -798,12 +797,12 @@ function toAnalyzePaper(paper: CollectedPaper): AnalyzePaper {
   return {
     id: paper.id,
     title: paper.title,
-    abstract: paper.abstract || ANALYZE_NOT_REPORTED,
-    journal: paper.journal || ANALYZE_NOT_REPORTED,
-    authors: paper.authors.length > 0 ? paper.authors : [ANALYZE_NOT_REPORTED],
-    doi: paper.doi ?? ANALYZE_NOT_REPORTED,
-    pmid: paper.pmid ?? ANALYZE_NOT_REPORTED,
-    publishedAt: paper.publishedAt ?? ANALYZE_NOT_REPORTED,
+    abstract: paper.abstract || DISPLAY_NOT_REPORTED,
+    journal: paper.journal || DISPLAY_NOT_REPORTED,
+    authors: paper.authors.length > 0 ? paper.authors : [DISPLAY_NOT_REPORTED],
+    doi: paper.doi ?? DISPLAY_NOT_REPORTED,
+    pmid: paper.pmid ?? DISPLAY_NOT_REPORTED,
+    publishedAt: paper.publishedAt ?? DISPLAY_NOT_REPORTED,
     url: paper.url,
     source: uniqueStrings(paper.sources.map(toZhSourceName)).join(" / "),
     signalScore: paper.signalScore,
@@ -1014,7 +1013,7 @@ function topCounts(values: string[], limit = 3) {
 
   for (const value of values) {
     const normalized = value.trim();
-    if (!normalized || normalized === ANALYZE_NOT_REPORTED) {
+    if (!normalized || normalized === DISPLAY_NOT_REPORTED) {
       continue;
     }
 
@@ -1035,7 +1034,7 @@ function splitFeatureValues(value: string) {
 }
 
 function uniqueNonReported(values: string[]) {
-  return uniqueStrings(values.filter((value) => value && value !== ANALYZE_NOT_REPORTED && value !== NOT_REPORTED));
+  return uniqueStrings(values.filter((value) => value && value !== DISPLAY_NOT_REPORTED && value !== NOT_REPORTED));
 }
 
 function buildSeedClassificationText(
@@ -1353,10 +1352,10 @@ export function classifyTechnologyTransferPath(
     );
   }
 
-  if (isSpecificityFocused || extraction.offTargetAnalysis === ANALYZE_NOT_REPORTED) {
+  if (isSpecificityFocused || extraction.offTargetAnalysis === DISPLAY_NOT_REPORTED) {
     add(
       "specificity_optimization",
-      extraction.offTargetAnalysis === ANALYZE_NOT_REPORTED
+      extraction.offTargetAnalysis === DISPLAY_NOT_REPORTED
         ? "当前论文尚未充分展开脱靶或特异性验证，因此补做特异性优化与比较，是合理且必要的延展路径。"
         : "在已有脱靶或特异性讨论基础上继续优化安全性，往往能形成更完整的方法学或平台升级文章。",
       "中",
@@ -1399,10 +1398,10 @@ export function buildPaperStrategySummary(
   feature: GeneEditingFeature,
   transferPaths: TechnologyTransferPathSummary[],
 ): PaperStrategySummary {
-  const editingTool = feature.editingTool !== ANALYZE_NOT_REPORTED ? feature.editingTool : feature.editingType;
-  const organism = feature.organism !== ANALYZE_NOT_REPORTED ? feature.organism : ANALYZE_NOT_REPORTED;
-  const targetGene = feature.targetGene !== ANALYZE_NOT_REPORTED ? feature.targetGene : ANALYZE_NOT_REPORTED;
-  const targetTrait = feature.targetTrait !== ANALYZE_NOT_REPORTED ? feature.targetTrait : ANALYZE_NOT_REPORTED;
+  const editingTool = feature.editingTool !== DISPLAY_NOT_REPORTED ? feature.editingTool : feature.editingType;
+  const organism = feature.organism !== DISPLAY_NOT_REPORTED ? feature.organism : DISPLAY_NOT_REPORTED;
+  const targetGene = feature.targetGene !== DISPLAY_NOT_REPORTED ? feature.targetGene : DISPLAY_NOT_REPORTED;
+  const targetTrait = feature.targetTrait !== DISPLAY_NOT_REPORTED ? feature.targetTrait : DISPLAY_NOT_REPORTED;
   const paperFocusText = normalizeTitle([seedPaper.title, seedPaper.abstract, feature.mainInnovation, feature.paperType, feature.limitations].join(" "));
   const hasMultiplexSignal = /\b(multiplex|multigene|multi-gene|five key genes|quintuple|pathway)\b/.test(paperFocusText);
   const hasTraitQuantification = /\b(vitamin|phytonutrient|lycopene|gaba|quality|yield|resistance|metabolite|trait)\b/.test(paperFocusText);
@@ -1417,28 +1416,28 @@ export function buildPaperStrategySummary(
   const isToolPaper =
     /\b(optimized|optimization|variant|architecture|platform|tool|editor|pegRNA|sgRNA|compare|comparison|enhancing efficiency)\b/.test(
       paperFocusText,
-    ) || feature.mainInnovation !== ANALYZE_NOT_REPORTED;
+    ) || feature.mainInnovation !== DISPLAY_NOT_REPORTED;
   const isTraitPaper =
-    targetTrait !== ANALYZE_NOT_REPORTED ||
-    feature.phenotypeValidation !== ANALYZE_NOT_REPORTED ||
+    targetTrait !== DISPLAY_NOT_REPORTED ||
+    feature.phenotypeValidation !== DISPLAY_NOT_REPORTED ||
     /\b(trait|yield|quality|nutrition|biofortification|phytonutrient|rescue|resistance|phenotype|agronomic)\b/.test(paperFocusText);
 
   const overallStrategy =
     isTraitPaper && hasMultiplexSignal
-      ? `该研究围绕${targetTrait !== ANALYZE_NOT_REPORTED ? targetTrait : "目标性状"}这一应用问题，采用${editingTool}在${primaryOrganism}中同步编辑多个关键位点，以通路级重构的方式完成性状强化，并进一步用功能或表型结果证明其应用价值。`
+      ? `该研究围绕${targetTrait !== DISPLAY_NOT_REPORTED ? targetTrait : "目标性状"}这一应用问题，采用${editingTool}在${primaryOrganism}中同步编辑多个关键位点，以通路级重构的方式完成性状强化，并进一步用功能或表型结果证明其应用价值。`
       : isToolPaper
-        ? `该研究围绕编辑工具本身的可用性与扩展性，先在${primaryOrganism}中建立或优化${editingTool}路线，再围绕${targetGene !== ANALYZE_NOT_REPORTED ? targetGene : "目标位点"}验证该工具是否具备更好的性能与迁移潜力。`
-        : `该研究围绕${targetTrait !== ANALYZE_NOT_REPORTED ? targetTrait : "目标问题"}，采用${editingTool}在${primaryOrganism}中完成编辑验证，并通过功能或表型读出支撑研究结论。`;
+        ? `该研究围绕编辑工具本身的可用性与扩展性，先在${primaryOrganism}中建立或优化${editingTool}路线，再围绕${targetGene !== DISPLAY_NOT_REPORTED ? targetGene : "目标位点"}验证该工具是否具备更好的性能与迁移潜力。`
+        : `该研究围绕${targetTrait !== DISPLAY_NOT_REPORTED ? targetTrait : "目标问题"}，采用${editingTool}在${primaryOrganism}中完成编辑验证，并通过功能或表型读出支撑研究结论。`;
 
   const whyPublishable =
     isTraitPaper
-      ? `它之所以具有发表性，关键在于把编辑工具、${primaryOrganism}体系与${targetTrait !== ANALYZE_NOT_REPORTED ? targetTrait : "应用终点"}直接连接起来，并用${hasTraitQuantification ? "代谢物或目标性状定量" : "功能读出"}、${hasTradeoffCheck ? "trade-off 评估" : "表型观察"}${hasInVivoValidation ? "以及进一步的体内验证" : ""}组成较完整的数据闭环。`
-      : `它之所以能够发表，核心不只是“能不能编辑”，而是提出了可比较、可迁移的技术路线，并在${primaryOrganism}中提供了${feature.offTargetAnalysis !== ANALYZE_NOT_REPORTED ? "性能与特异性" : "性能"}层面的关键验证，因此具备继续外推到其他体系的价值。`;
+      ? `它之所以具有发表性，关键在于把编辑工具、${primaryOrganism}体系与${targetTrait !== DISPLAY_NOT_REPORTED ? targetTrait : "应用终点"}直接连接起来，并用${hasTraitQuantification ? "代谢物或目标性状定量" : "功能读出"}、${hasTradeoffCheck ? "trade-off 评估" : "表型观察"}${hasInVivoValidation ? "以及进一步的体内验证" : ""}组成较完整的数据闭环。`
+      : `它之所以能够发表，核心不只是“能不能编辑”，而是提出了可比较、可迁移的技术路线，并在${primaryOrganism}中提供了${feature.offTargetAnalysis !== DISPLAY_NOT_REPORTED ? "性能与特异性" : "性能"}层面的关键验证，因此具备继续外推到其他体系的价值。`;
 
   const coreInnovation =
     hasMultiplexSignal && isTraitPaper
       ? `该研究的核心创新在于利用${editingTool}在${primaryOrganism}中同步编辑多个关键位点，把多条营养或功能相关通路整合到同一作物背景中，形成比单性状改良更完整的多目标应用框架。`
-      : feature.mainInnovation !== ANALYZE_NOT_REPORTED
+      : feature.mainInnovation !== DISPLAY_NOT_REPORTED
       ? feature.mainInnovation
       : transferPaths[0]
         ? `该研究最值得延展的创新点在于其“${transferPaths[0].label}”潜力，即该技术路线有机会跨体系迁移或转化为更强的后续应用。`
@@ -1446,19 +1445,19 @@ export function buildPaperStrategySummary(
 
   const evidenceChain = uniqueNonReported([
     hasMultiplexSignal ? "多基因 / 多位点编辑策略设计" : "编辑策略与构建设计",
-    feature.editingEfficiency !== ANALYZE_NOT_REPORTED ? "多靶点效率与编辑结果验证" : "编辑结果与分子层面验证",
+    feature.editingEfficiency !== DISPLAY_NOT_REPORTED ? "多靶点效率与编辑结果验证" : "编辑结果与分子层面验证",
     hasTraitQuantification ? "目标性状或代谢物定量检测" : "",
-    feature.phenotypeValidation !== ANALYZE_NOT_REPORTED ? "表型或功能验证" : "",
+    feature.phenotypeValidation !== DISPLAY_NOT_REPORTED ? "表型或功能验证" : "",
     hasTradeoffCheck ? "生长、果实品质或 trade-off 评估" : "",
     hasHeritabilitySignal ? "稳定遗传或后代一致性验证" : "",
-    feature.offTargetAnalysis !== ANALYZE_NOT_REPORTED ? "脱靶或副产物分析" : "",
+    feature.offTargetAnalysis !== DISPLAY_NOT_REPORTED ? "脱靶或副产物分析" : "",
   ]);
 
   const limitations = uniqueNonReported([
     ...splitInsightList(feature.limitations),
-    ...(feature.editingEfficiency === ANALYZE_NOT_REPORTED ? ["编辑效率的定量结果未报道。"] : []),
-    ...(feature.offTargetAnalysis === ANALYZE_NOT_REPORTED ? ["脱靶或特异性评估仍需补充。"] : []),
-    ...(feature.phenotypeValidation === ANALYZE_NOT_REPORTED ? ["表型或功能验证仍需进一步强化。"] : []),
+    ...(feature.editingEfficiency === DISPLAY_NOT_REPORTED ? ["编辑效率的定量结果未报道。"] : []),
+    ...(feature.offTargetAnalysis === DISPLAY_NOT_REPORTED ? ["脱靶或特异性评估仍需补充。"] : []),
+    ...(feature.phenotypeValidation === DISPLAY_NOT_REPORTED ? ["表型或功能验证仍需进一步强化。"] : []),
     ...(isPlantPaper && !hasHeritabilitySignal ? ["稳定遗传或后代一致性证据仍需进一步补齐。"] : []),
     ...(isToolPaper ? ["若缺少与既有编辑器版本的系统 head-to-head 比较，工具升级幅度仍可能被低估。"] : []),
     ...(transferPaths.length === 0 ? ["当前尚未形成明确的跨体系技术迁移路线。"] : []),
@@ -1468,8 +1467,8 @@ export function buildPaperStrategySummary(
     overallStrategy,
     whyPublishable,
     coreInnovation,
-    evidenceChain: evidenceChain.length > 0 ? evidenceChain : [ANALYZE_NOT_REPORTED],
-    limitations: limitations.length > 0 ? limitations : [ANALYZE_NOT_REPORTED],
+    evidenceChain: evidenceChain.length > 0 ? evidenceChain : [DISPLAY_NOT_REPORTED],
+    limitations: limitations.length > 0 ? limitations : [DISPLAY_NOT_REPORTED],
   };
 }
 
@@ -1770,10 +1769,10 @@ export function buildPaperModeIdeas(
       priority: pathSummary.priority,
       basedOnPapers: [seedPaper.title],
       innovationLogic: draft.innovationLogic,
-      feasibilityRisk: genericRiskWarnings[0] ?? ANALYZE_NOT_REPORTED,
+      feasibilityRisk: genericRiskWarnings[0] ?? DISPLAY_NOT_REPORTED,
       feasibilityRationale: draft.feasibilityRationale,
       minimumExperimentalPackage: draft.minimumExperimentPackage,
-      minimumExperimentPackage: draft.minimumExperimentPackage,
+      minimumExperimentPackage: draft.minimumExperimentPackage, // backward-compat alias
       recommendedJournalTier: suggestedJournalTier,
       suggestedJournalTier,
       articleType: localizedEvaluation.articleType,
@@ -1831,11 +1830,11 @@ function buildLlmPaperStrategySummary(insights: PaperInsightsLlm): PaperStrategy
   const limitations = uniqueNonReported(strategySummary.limitations);
 
   return {
-    overallStrategy: strategySummary.overallStrategy || ANALYZE_NOT_REPORTED,
-    whyPublishable: strategySummary.whyPublishable || ANALYZE_NOT_REPORTED,
-    coreInnovation: strategySummary.coreInnovation || ANALYZE_NOT_REPORTED,
-    evidenceChain: evidenceChain.length > 0 ? evidenceChain : [ANALYZE_NOT_REPORTED],
-    limitations: limitations.length > 0 ? limitations : [ANALYZE_NOT_REPORTED],
+    overallStrategy: strategySummary.overallStrategy || DISPLAY_NOT_REPORTED,
+    whyPublishable: strategySummary.whyPublishable || DISPLAY_NOT_REPORTED,
+    coreInnovation: strategySummary.coreInnovation || DISPLAY_NOT_REPORTED,
+    evidenceChain: evidenceChain.length > 0 ? evidenceChain : [DISPLAY_NOT_REPORTED],
+    limitations: limitations.length > 0 ? limitations : [DISPLAY_NOT_REPORTED],
   };
 }
 
@@ -1885,8 +1884,8 @@ function buildLlmPaperModeIdeas(
       priority,
       basedOnPapers: [seedPaper.title],
       innovationLogic: draft.innovationLogic,
-      feasibilityRisk: riskWarnings[0] ?? ANALYZE_NOT_REPORTED,
-      feasibilityRationale: draft.feasibilityRationale || ANALYZE_NOT_REPORTED,
+      feasibilityRisk: riskWarnings[0] ?? DISPLAY_NOT_REPORTED,
+      feasibilityRationale: draft.feasibilityRationale || DISPLAY_NOT_REPORTED,
       minimumExperimentalPackage: minimumExperimentPackage,
       minimumExperimentPackage,
       recommendedJournalTier: suggestedJournalTier,
@@ -1940,8 +1939,8 @@ export function buildFieldOverview(analyzedPapers: AnalyzePaper[], features: Gen
   const applications = topCounts(features.flatMap((feature) => splitFeatureValues(feature.targetTrait)));
 
   const gaps: string[] = [];
-  const offTargetMissing = features.filter((feature) => feature.offTargetAnalysis === ANALYZE_NOT_REPORTED).length;
-  const phenotypeMissing = features.filter((feature) => feature.phenotypeValidation === ANALYZE_NOT_REPORTED).length;
+  const offTargetMissing = features.filter((feature) => feature.offTargetAnalysis === DISPLAY_NOT_REPORTED).length;
+  const phenotypeMissing = features.filter((feature) => feature.phenotypeValidation === DISPLAY_NOT_REPORTED).length;
 
   if (offTargetMissing >= Math.ceil(features.length / 2)) {
     gaps.push("多数研究未系统报告脱靶分析。");
@@ -1965,10 +1964,10 @@ export function buildFieldOverview(analyzedPapers: AnalyzePaper[], features: Gen
 
   const lines = [
     `当前研究状态：${currentStatus}`,
-    `主要编辑工具：${tools.join("；") || ANALYZE_NOT_REPORTED}。`,
-    `主要研究物种：${organisms.join("；") || ANALYZE_NOT_REPORTED}。`,
-    `常见递送方式：${deliveryMethods.join("；") || ANALYZE_NOT_REPORTED}。`,
-    `已报道应用方向：${applications.join("；") || ANALYZE_NOT_REPORTED}。`,
+    `主要编辑工具：${tools.join("；") || DISPLAY_NOT_REPORTED}。`,
+    `主要研究物种：${organisms.join("；") || DISPLAY_NOT_REPORTED}。`,
+    `常见递送方式：${deliveryMethods.join("；") || DISPLAY_NOT_REPORTED}。`,
+    `已报道应用方向：${applications.join("；") || DISPLAY_NOT_REPORTED}。`,
     `潜在研究空白：${gaps.join("；") || "当前样本中尚未形成明确的共性空白。"}。`,
   ];
 
@@ -1985,12 +1984,12 @@ export function buildJournalSuggestions(
   analyzedPapers: AnalyzePaper[] = [],
 ): JournalSuggestion[] {
   const uniqueTiers = uniqueStrings([evaluation.journalTier, ...ideas.map((idea) => idea.recommendedJournalTier)])
-    .filter((tier) => tier && tier !== ANALYZE_NOT_REPORTED)
+    .filter((tier) => tier && tier !== DISPLAY_NOT_REPORTED)
     .slice(0, 3);
   const observedJournals = uniqueStrings(
     analyzedPapers
       .map((paper) => paper.journal)
-      .filter((journal) => journal !== ANALYZE_NOT_REPORTED),
+      .filter((journal) => journal !== DISPLAY_NOT_REPORTED),
   );
 
   const defaultExamples: Record<string, string[]> = {
@@ -2310,13 +2309,13 @@ export async function analyzeResearchInput(input: AnalyzeRequestInput): Promise<
         };
       })()
     : {
-        targetIdeaName: ANALYZE_NOT_REPORTED,
+        targetIdeaName: DISPLAY_NOT_REPORTED,
         novelty: 0,
         feasibility: 0,
         publicationPotential: 0,
         competitionRisk: 0,
-        articleType: ANALYZE_NOT_REPORTED,
-        additionalExperiments: [ANALYZE_NOT_REPORTED],
+        articleType: DISPLAY_NOT_REPORTED,
+        additionalExperiments: [DISPLAY_NOT_REPORTED],
         journalTier: toZhJournalTier("focused application or methods journal"),
         lowNoveltyWarning: undefined,
         rationale: ["当前未生成可评估的衍生选题。"],
@@ -2341,7 +2340,7 @@ export async function analyzeResearchInput(input: AnalyzeRequestInput): Promise<
             competitionRisk: leadIdea.competitionRisk,
             articleType: leadIdea.articleType,
             additionalExperiments:
-              leadIdea.minimumExperimentPackage.length > 0 ? leadIdea.minimumExperimentPackage : [ANALYZE_NOT_REPORTED],
+              leadIdea.minimumExperimentPackage.length > 0 ? leadIdea.minimumExperimentPackage : [DISPLAY_NOT_REPORTED],
             journalTier: leadIdea.suggestedJournalTier,
             warning: leadIdea.warning,
             lowNoveltyWarning: leadIdea.priority === "低" ? "低创新增量研究" : undefined,

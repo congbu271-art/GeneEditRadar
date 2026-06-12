@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { authors, geneTargets, getPaperById, journals, type RadarPaper } from "@/lib/mock-data";
 import { isLlmEnabled, llmJson } from "@/lib/llm";
+import { normalizeWhitespace, stripMarkup } from "@/lib/shared-utils";
 
 export const NOT_REPORTED = "not reported";
 
@@ -50,22 +51,6 @@ const LLM_REFINABLE_FIELDS: RefinableExtractionField[] = [
   "paperType",
   "followUpOpportunities",
 ];
-
-function normalizeWhitespace(value: string) {
-  return value.replace(/\s+/g, " ").trim();
-}
-
-function stripMarkup(value: string) {
-  return normalizeWhitespace(
-    value
-      .replace(/<[^>]+>/g, " ")
-      .replace(/&amp;/g, "&")
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">")
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'"),
-  );
-}
 
 function normalizeLower(value: string) {
   return stripMarkup(value)

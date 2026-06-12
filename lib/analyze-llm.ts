@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { isLlmEnabled, llmJson } from "@/lib/llm";
+import { DISPLAY_NOT_REPORTED } from "@/lib/shared-utils";
 import type { AnalyzePaper, GeneEditingFeature, TechnologyTransferPath } from "@/lib/analyze-types";
 
 /**
@@ -12,8 +13,6 @@ import type { AnalyzePaper, GeneEditingFeature, TechnologyTransferPath } from "@
  * 四维评分、期刊层级等仍由 analyze.ts 复用现有规则函数完成。
  * 任何失败返回 null，由 analyze.ts 回退到规则引擎。
  */
-
-const ANALYZE_NOT_REPORTED = "未报道";
 
 // 与 analyze-types.ts 的 TechnologyTransferPath 保持一致（编译期下方做静态校验）。
 const TRANSFER_PATH_VALUES = [
@@ -64,7 +63,7 @@ export type FieldOverviewAnchors = {
 
 function joinOrNotReported(values: string[]) {
   const cleaned = values.map((value) => value.trim()).filter(Boolean);
-  return cleaned.length > 0 ? cleaned.join("；") : ANALYZE_NOT_REPORTED;
+  return cleaned.length > 0 ? cleaned.join("；") : DISPLAY_NOT_REPORTED;
 }
 
 /**
@@ -84,7 +83,7 @@ export async function buildFieldOverviewWithLlm(
     title: paper.title,
     journal: paper.journal,
     publishedAt: paper.publishedAt,
-    abstract: paper.abstract && paper.abstract !== ANALYZE_NOT_REPORTED ? paper.abstract : "",
+    abstract: paper.abstract && paper.abstract !== DISPLAY_NOT_REPORTED ? paper.abstract : "",
   }));
 
   const userPayload = JSON.stringify(
@@ -114,7 +113,7 @@ export async function buildFieldOverviewWithLlm(
   }
 
   const lines = [
-    `当前研究状态：${parsed.currentStatus.trim() || ANALYZE_NOT_REPORTED}`,
+    `当前研究状态：${parsed.currentStatus.trim() || DISPLAY_NOT_REPORTED}`,
     `主要编辑工具：${joinOrNotReported(parsed.mainTools)}。`,
     `主要研究物种：${joinOrNotReported(parsed.mainOrganisms)}。`,
     `常见递送方式：${joinOrNotReported(parsed.deliveries)}。`,

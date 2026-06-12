@@ -4,6 +4,8 @@ import type { ExtractionSourcePaper } from "@/lib/paper-extraction";
 
 // ─── String utilities ────────────────────────────────────────────────────────
 
+export const DISPLAY_NOT_REPORTED = "未报道";
+
 export function uniqueStrings(values: string[]) {
   return Array.from(new Set(values.filter(Boolean)));
 }

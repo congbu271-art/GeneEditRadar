@@ -17,12 +17,12 @@ import {
   matchPaperToSubscription,
   normalizeDoi,
   normalizePmid,
-  normalizeTitle,
   type CollectedPaper,
   type LiteratureSource,
   type LiteratureSourceStatus,
   type PaperMatch,
 } from "@/lib/literature";
+import { normalizeTitle } from "@/lib/shared-utils";
 import { collectRssLiterature } from "@/lib/literature-rss";
 import { llmEmbedding } from "@/lib/llm";
 import type { RadarSubscription } from "@/lib/mock-data";

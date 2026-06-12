@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { subscriptions } from "../lib/mock-data";
-import { dedupePapers, matchPaperToSubscription, normalizeTitle, type CollectedPaper } from "../lib/literature";
+import { dedupePapers, matchPaperToSubscription, type CollectedPaper } from "../lib/literature";
+import { normalizeTitle } from "../lib/shared-utils";
 
 function makePaper(overrides: Partial<CollectedPaper> = {}): CollectedPaper {
   const title = overrides.title ?? "Programmable liver prime editing enables durable PCSK9 knockdown";

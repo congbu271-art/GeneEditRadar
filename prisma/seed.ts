@@ -1,18 +1,9 @@
 import { PrismaClient, EvaluationVerdict, IdeaStage, PaperStage, PaperStatus, SubscriptionCadence } from "@prisma/client";
 
 import { authors, evaluations, geneTargets, ideas, journals, papers, subscriptions, topics } from "../lib/mock-data";
+import { normalizeTitle } from "../lib/shared-utils";
 
 const prisma = new PrismaClient();
-
-function normalizeTitle(title: string) {
-  return title
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9\s]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
 
 function toPaperStage(stage: string): PaperStage {
   switch (stage) {

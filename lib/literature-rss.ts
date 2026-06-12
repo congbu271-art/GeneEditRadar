@@ -1,8 +1,8 @@
 import { XMLParser } from "fast-xml-parser";
 
-import { normalizeDoi, normalizeTitle, type CollectedPaper, type LiteratureSourceStatus } from "@/lib/literature";
+import { normalizeDoi, type CollectedPaper, type LiteratureSourceStatus } from "@/lib/literature";
 import { getConfiguredRssFeeds, type LiteratureRssFeed } from "@/lib/rss-feeds";
-import { inferEditorTypes, inferOrganisms, normalizeWhitespace, stripMarkup, uniqueStrings } from "@/lib/shared-utils";
+import { inferEditorTypes, inferOrganisms, normalizeTitle, normalizeWhitespace, stripMarkup, uniqueStrings } from "@/lib/shared-utils";
 
 type RssSourceStatus = LiteratureSourceStatus & {
   feedUrl: string;
