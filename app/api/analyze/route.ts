@@ -5,12 +5,25 @@ import { analyzeResearchInput, normalizeAnalyzeRequest } from "@/lib/analyze";
 
 const analyzeRequestSchema = z.object({
   mode: z.enum(["keyword", "paper"]),
-  query: z.string().trim().min(1, "query is required"),
+  query: z.string().trim().min(1, "query is required").max(2000, "query is too long"),
 });
+
+const MAX_BODY_SIZE = 1024 * 4; // 4 KB
 
 export async function POST(request: Request) {
   try {
-    const payload = normalizeAnalyzeRequest(analyzeRequestSchema.parse(await request.json()));
+    const contentLength = request.headers.get("content-length");
+    if (contentLength && parseInt(contentLength, 10) > MAX_BODY_SIZE) {
+      return NextResponse.json({ error: "请求体过大。" }, { status: 413 });
+    }
+
+    const body = await request.json();
+
+    if (JSON.stringify(body).length > MAX_BODY_SIZE) {
+      return NextResponse.json({ error: "请求体过大。" }, { status: 413 });
+    }
+
+    const payload = normalizeAnalyzeRequest(analyzeRequestSchema.parse(body));
     const result = await analyzeResearchInput(payload);
 
     return NextResponse.json(result);
@@ -26,9 +39,7 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "分析请求失败。",
-      },
+      { error: "分析请求失败，请稍后重试。" },
       { status: 500 },
     );
   }

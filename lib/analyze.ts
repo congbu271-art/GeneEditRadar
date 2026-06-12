@@ -1,3 +1,5 @@
+import { XMLParser } from "fast-xml-parser";
+
 import { analysisSeedPapers, authors, journals, papers, topics, type RadarPaper } from "@/lib/mock-data";
 import {
   NOT_REPORTED,
@@ -50,6 +52,20 @@ import {
   type FieldOverviewAnchors,
   type PaperInsightsLlm,
 } from "@/lib/analyze-llm";
+import {
+  canonicalizeJournal,
+  coerceIsoDate,
+  createCollectedPaper,
+  fetchJson,
+  inferEditorTypes,
+  inferOrganisms,
+  normalizeWhitespace,
+  parseAuthorList,
+  parseCrossrefDate,
+  stripMarkup,
+  toExtractionSourcePaper,
+  uniqueStrings,
+} from "@/lib/shared-utils";
 
 export type {
   AnalyzeEvaluation,
@@ -131,185 +147,7 @@ const transferPathLabelMap: Record<TechnologyTransferPath, string> = {
   specificity_optimization: "特异性/脱靶优化",
 };
 
-function uniqueStrings(values: string[]) {
-  return Array.from(new Set(values.filter(Boolean)));
-}
 
-function normalizeWhitespace(value: string) {
-  return value.replace(/\s+/g, " ").trim();
-}
-
-function stripMarkup(value: string) {
-  return normalizeWhitespace(
-    value
-      .replace(/<[^>]+>/g, " ")
-      .replace(/&amp;/g, "&")
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">")
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'"),
-  );
-}
-
-function canonicalizeJournal(value: string) {
-  return normalizeTitle(value);
-}
-
-function parseAuthorList(rawAuthors: Array<{ name?: string; authname?: string; given?: string; family?: string }> | undefined) {
-  if (!rawAuthors) {
-    return [];
-  }
-
-  return uniqueStrings(
-    rawAuthors
-      .map((author) => author.name ?? author.authname ?? [author.given, author.family].filter(Boolean).join(" "))
-      .filter(Boolean)
-      .map(stripMarkup),
-  );
-}
-
-function coerceIsoDate(value?: string) {
-  if (!value) {
-    return undefined;
-  }
-
-  const timestamp = Date.parse(value);
-  if (Number.isNaN(timestamp)) {
-    return undefined;
-  }
-
-  return new Date(timestamp).toISOString().slice(0, 10);
-}
-
-function parseCrossrefDate(parts?: number[][]) {
-  const date = parts?.[0];
-
-  if (!date?.length) {
-    return undefined;
-  }
-
-  const [year, month = 1, day = 1] = date;
-  return new Date(Date.UTC(year, month - 1, day)).toISOString().slice(0, 10);
-}
-
-function inferOrganisms(...values: string[]) {
-  const text = normalizeTitle(values.join(" "));
-  const pairs: Array<[RegExp, string]> = [
-    [/\b(human|patient|patients|clinical)\b/, "Human"],
-    [/\b(primate|primates|macaque|macaques|nonhuman primate|non human primate)\b/, "Primate"],
-    [/\b(mouse|mice|murine)\b/, "Mouse"],
-    [/\b(rat|rats)\b/, "Rat"],
-    [/\b(rodent|rodents)\b/, "Rodent"],
-    [/\b(canine|dog|dogs)\b/, "Canine"],
-    [/\b(large animal|large animal model)\b/, "Large animal"],
-    [/\b(zebrafish)\b/, "Zebrafish"],
-    [/\b(rice|oryza sativa)\b/, "Rice"],
-    [/\b(maize|corn|zea mays)\b/, "Maize"],
-    [/\b(wheat|triticum)\b/, "Wheat"],
-    [/\b(arabidopsis)\b/, "Arabidopsis"],
-  ];
-
-  return uniqueStrings(
-    pairs
-      .filter(([pattern]) => pattern.test(text))
-      .map(([, label]) => label),
-  );
-}
-
-function inferEditorTypes(...values: string[]) {
-  const text = normalizeTitle(values.join(" "));
-  const pairs: Array<[RegExp, string]> = [
-    [/\bprime edit(ing|or)?\b/, "Prime editing"],
-    [/\badenine base edit(ing|or)?\b/, "Adenine base editing"],
-    [/\bcytosine base edit(ing|or)?\b/, "Cytosine base editing"],
-    [/\bbase edit(ing|or)?\b/, "Base editing"],
-    [/\bcrispr screen(ing)?\b/, "CRISPR screening"],
-    [/\bmultiplex\b/, "Multiplex editing"],
-    [/\bcas12\b/, "Cas12 editing"],
-    [/\bcas9\b/, "Cas9 editing"],
-    [/\bcrispr\b/, "CRISPR"],
-  ];
-
-  return uniqueStrings(
-    pairs
-      .filter(([pattern]) => pattern.test(text))
-      .map(([, label]) => label),
-  );
-}
-
-function buildPaperKeywords(input: {
-  title: string;
-  abstract: string;
-  journal: string;
-  authors: string[];
-  organisms: string[];
-  editorTypes: string[];
-}) {
-  const tokens = [
-    ...input.editorTypes,
-    ...input.organisms,
-    input.journal,
-    ...input.authors,
-  ];
-
-  const geneLikeTokens = `${input.title} ${input.abstract}`.match(/\b[A-Z0-9-]{3,8}\b/g) ?? [];
-
-  return uniqueStrings([...tokens, ...geneLikeTokens].map(stripMarkup));
-}
-
-function calculateSignalScore(paper: Omit<CollectedPaper, "signalScore">) {
-  let score = 34;
-
-  if (paper.abstract) {
-    score += 12;
-  }
-
-  if (paper.doi) {
-    score += 12;
-  }
-
-  if (paper.pmid) {
-    score += 8;
-  }
-
-  score += Math.min(12, paper.authors.length * 3);
-  score += Math.min(10, paper.organisms.length * 4);
-  score += Math.min(12, paper.editorTypes.length * 4);
-  score += paper.journal ? 6 : 0;
-
-  if (paper.sources.length > 1) {
-    score += 8;
-  }
-
-  if (paper.publishedAt) {
-    const ageInDays = Math.max(0, Math.round((Date.now() - new Date(paper.publishedAt).getTime()) / 86_400_000));
-
-    if (ageInDays <= 180) {
-      score += 10;
-    } else if (ageInDays <= 365) {
-      score += 6;
-    } else {
-      score += 2;
-    }
-  }
-
-  return Math.min(100, Math.round(score));
-}
-
-function createCollectedPaper(input: Omit<CollectedPaper, "id" | "normalizedTitle" | "keywords" | "signalScore">) {
-  const normalizedTitle = normalizeTitle(input.title);
-  const paper: Omit<CollectedPaper, "signalScore"> = {
-    ...input,
-    id: `${input.primarySource}-${input.sourceIds[input.primarySource] ?? normalizedTitle.slice(0, 24)}`,
-    normalizedTitle,
-    keywords: buildPaperKeywords(input),
-  };
-
-  return {
-    ...paper,
-    signalScore: calculateSignalScore(paper),
-  };
-}
 
 function normalizeMockPaper(paper: RadarPaper): CollectedPaper {
   const journal = journals.find((journalItem) => journalItem.slug === paper.journalSlug)?.name ?? paper.journalSlug;
@@ -355,22 +193,7 @@ function normalizeAnalysisSeedPaper(paper: (typeof analysisSeedPapers)[number]):
 
 const mockCollectedPapers = [...papers.map(normalizeMockPaper), ...analysisSeedPapers.map(normalizeAnalysisSeedPaper)];
 
-async function fetchJson<T>(url: URL, source: Exclude<LiteratureSource, "mock">) {
-  const response = await fetch(url, {
-    headers: {
-      accept: "application/json",
-      "user-agent": "GeneEditRadar/0.1",
-    },
-    next: { revalidate: 1800 },
-    signal: AbortSignal.timeout(API_TIMEOUT_MS),
-  });
 
-  if (!response.ok) {
-    throw new Error(`${source} returned ${response.status}`);
-  }
-
-  return (await response.json()) as T;
-}
 
 async function searchPubMedByKeyword(query: string, limit = DEFAULT_ANALYSIS_LIMIT): Promise<SourceResult> {
   const esearchUrl = new URL("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi");
@@ -511,19 +334,28 @@ async function fetchPubMedAbstracts(pmids: string[]): Promise<Map<string, string
 
     const xml = await response.text();
 
-    // 逐篇 <PubmedArticle> 解析，提取 PMID 与拼接后的 <AbstractText>。
-    const articles = xml.split(/<PubmedArticle[>\s]/).slice(1);
-    for (const article of articles) {
-      const pmidMatch = article.match(/<PMID[^>]*>(\d+)<\/PMID>/);
-      if (!pmidMatch) {
+    const parser = new XMLParser({ ignoreAttributes: false });
+    const parsed = parser.parse(xml);
+    const articles = parsed?.PubmedArticleSet?.PubmedArticle;
+    const articleList = Array.isArray(articles) ? articles : articles ? [articles] : [];
+
+    for (const article of articleList) {
+      const pmid = article?.MedlineCitation?.PMID;
+      if (!pmid) {
         continue;
       }
 
-      const abstractParts = article.match(/<AbstractText[^>]*>([\s\S]*?)<\/AbstractText>/g) ?? [];
-      const abstract = stripMarkup(abstractParts.map((part) => part.replace(/<[^>]+>/g, " ")).join(" "));
+      const abstractTexts = article?.MedlineCitation?.Article?.Abstract?.AbstractText;
+      const parts = Array.isArray(abstractTexts) ? abstractTexts : abstractTexts ? [abstractTexts] : [];
+      const abstract = stripMarkup(parts.map((part: unknown) => {
+        if (typeof part === "object" && part !== null && "#text" in part) {
+          return String((part as Record<string, unknown>)["#text"] ?? "");
+        }
+        return String(part ?? "");
+      }).join(" "));
 
       if (abstract) {
-        result.set(pmidMatch[1], abstract);
+        result.set(String(pmid), abstract);
       }
     }
   } catch {
@@ -952,19 +784,7 @@ function buildRelatedKeywordFromPaper(paper: CollectedPaper, extraction: GeneEdi
     .join(" ");
 }
 
-function toExtractionSourcePaper(paper: CollectedPaper): ExtractionSourcePaper {
-  return {
-    id: paper.id,
-    title: paper.title,
-    abstract: paper.abstract,
-    journal: paper.journal,
-    authors: paper.authors,
-    publishedAt: paper.publishedAt,
-    organisms: paper.organisms,
-    editorTypes: paper.editorTypes,
-    appPaperId: paper.appPaperId,
-  };
-}
+
 
 function localizeReportedValue(value?: string) {
   if (!value || value === NOT_REPORTED) {

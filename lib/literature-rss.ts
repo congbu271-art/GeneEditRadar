@@ -2,6 +2,7 @@ import { XMLParser } from "fast-xml-parser";
 
 import { normalizeDoi, normalizeTitle, type CollectedPaper, type LiteratureSourceStatus } from "@/lib/literature";
 import { getConfiguredRssFeeds, type LiteratureRssFeed } from "@/lib/rss-feeds";
+import { inferEditorTypes, inferOrganisms, normalizeWhitespace, stripMarkup, uniqueStrings } from "@/lib/shared-utils";
 
 type RssSourceStatus = LiteratureSourceStatus & {
   feedUrl: string;
@@ -38,26 +39,6 @@ const geneEditingTerms = [
   "talen",
   "zfn",
 ];
-
-function normalizeWhitespace(value: string) {
-  return value.replace(/\s+/g, " ").trim();
-}
-
-function stripMarkup(value: string) {
-  return normalizeWhitespace(
-    value
-      .replace(/<[^>]+>/g, " ")
-      .replace(/&amp;/g, "&")
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">")
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'"),
-  );
-}
-
-function uniqueStrings(values: string[]) {
-  return Array.from(new Set(values.filter(Boolean)));
-}
 
 function toArray<T>(value: T | T[] | undefined | null): T[] {
   if (value === undefined || value === null) {
@@ -122,37 +103,6 @@ function extractDoi(...values: string[]) {
   const text = values.join(" ");
   const match = text.match(/\b10\.\d{4,9}\/[-._;()/:A-Z0-9]+\b/i);
   return normalizeDoi(match?.[0]);
-}
-
-function inferEditorTypes(...values: string[]) {
-  const text = normalizeTitle(values.join(" "));
-  const pairs: Array<[RegExp, string]> = [
-    [/\bprime edit(ing|or)?\b/, "Prime editing"],
-    [/\badenine base edit(ing|or)?\b/, "Adenine base editing"],
-    [/\bcytosine base edit(ing|or)?\b/, "Cytosine base editing"],
-    [/\bbase edit(ing|or)?\b/, "Base editing"],
-    [/\bcas12\b/, "Cas12 editing"],
-    [/\bcas9\b/, "Cas9 editing"],
-    [/\bcrispr\b/, "CRISPR"],
-  ];
-
-  return uniqueStrings(pairs.filter(([pattern]) => pattern.test(text)).map(([, label]) => label));
-}
-
-function inferOrganisms(...values: string[]) {
-  const text = normalizeTitle(values.join(" "));
-  const pairs: Array<[RegExp, string]> = [
-    [/\b(human|patient|clinical)\b/, "Human"],
-    [/\b(mouse|mice|murine)\b/, "Mouse"],
-    [/\bprimate|macaque\b/, "Primate"],
-    [/\brice|oryza\b/, "Rice"],
-    [/\bwheat|triticum\b/, "Wheat"],
-    [/\bmaize|corn\b/, "Maize"],
-    [/\btomato\b/, "Tomato"],
-    [/\barabidopsis\b/, "Arabidopsis"],
-  ];
-
-  return uniqueStrings(pairs.filter(([pattern]) => pattern.test(text)).map(([, label]) => label));
 }
 
 function buildKeywords(title: string, abstract: string, journal: string, editorTypes: string[], organisms: string[]) {

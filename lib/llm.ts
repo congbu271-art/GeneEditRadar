@@ -33,6 +33,9 @@ function readModel(): string {
 
 /** 是否已配置可用的 LLM（存在非空 key）。无 key 时全链路走规则引擎。 */
 export function isLlmEnabled(): boolean {
+  if (typeof window !== "undefined") {
+    return false;
+  }
   return readApiKey().length > 0;
 }
 

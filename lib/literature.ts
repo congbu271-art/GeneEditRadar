@@ -14,6 +14,21 @@ import {
   type ExtractionSourcePaper,
   type GeneEditingExtraction,
 } from "@/lib/paper-extraction";
+import {
+  calculateSignalScore,
+  canonicalizeJournal,
+  coerceIsoDate,
+  createCollectedPaper,
+  fetchJson,
+  inferEditorTypes,
+  inferOrganisms,
+  normalizeWhitespace,
+  parseAuthorList,
+  parseCrossrefDate,
+  stripMarkup,
+  toExtractionSourcePaper,
+  uniqueStrings,
+} from "@/lib/shared-utils";
 
 export type LiteratureSource = "pubmed" | "europe-pmc" | "crossref" | "rss" | "biorxiv" | "medrxiv" | "mock";
 
@@ -123,27 +138,6 @@ const MATCH_WEIGHTS = {
 const API_TIMEOUT_MS = 6500;
 const DEFAULT_LIMIT_PER_SOURCE = 6;
 
-function uniqueStrings(values: string[]) {
-  return Array.from(new Set(values.filter(Boolean)));
-}
-
-function normalizeWhitespace(value: string) {
-  return value.replace(/\s+/g, " ").trim();
-}
-
-function decodeHtml(value: string) {
-  return value
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'");
-}
-
-function stripMarkup(value: string) {
-  return normalizeWhitespace(decodeHtml(value).replace(/<[^>]+>/g, " "));
-}
-
 export function normalizeDoi(value?: string | null) {
   if (!value) {
     return undefined;
@@ -188,97 +182,6 @@ function normalizePersonName(value: string) {
     .trim();
 }
 
-function canonicalizeJournal(value: string) {
-  return normalizeTitle(value);
-}
-
-function parseCrossrefDate(parts?: number[][]) {
-  const date = parts?.[0];
-
-  if (!date?.length) {
-    return undefined;
-  }
-
-  const [year, month = 1, day = 1] = date;
-  return new Date(Date.UTC(year, month - 1, day)).toISOString().slice(0, 10);
-}
-
-function coerceIsoDate(value?: string) {
-  if (!value) {
-    return undefined;
-  }
-
-  const timestamp = Date.parse(value);
-  if (Number.isNaN(timestamp)) {
-    return undefined;
-  }
-
-  return new Date(timestamp).toISOString().slice(0, 10);
-}
-
-function inferOrganisms(...values: string[]) {
-  const text = normalizeTitle(values.join(" "));
-  const pairs: Array<[RegExp, string]> = [
-    [/\b(human|patient|patients|clinical)\b/, "Human"],
-    [/\b(primate|primates|macaque|macaques)\b/, "Primate"],
-    [/\b(mouse|mice|murine)\b/, "Mouse"],
-    [/\b(rat|rats)\b/, "Rat"],
-    [/\b(rodent|rodents)\b/, "Rodent"],
-    [/\b(canine|dog|dogs)\b/, "Canine"],
-    [/\b(nonhuman primate|non human primate)\b/, "Primate"],
-    [/\b(large animal|large animal model)\b/, "Large animal"],
-    [/\b(zebrafish)\b/, "Zebrafish"],
-  ];
-
-  return uniqueStrings(
-    pairs
-      .filter(([pattern]) => pattern.test(text))
-      .map(([, label]) => label),
-  );
-}
-
-function inferEditorTypes(...values: string[]) {
-  const text = normalizeTitle(values.join(" "));
-  const pairs: Array<[RegExp, string]> = [
-    [/\bprime edit(ing|or)?\b/, "Prime editing"],
-    [/\badenine base edit(ing|or)?\b/, "Adenine base editing"],
-    [/\bcytosine base edit(ing|or)?\b/, "Cytosine base editing"],
-    [/\bbase edit(ing|or)?\b/, "Base editing"],
-    [/\bcrispr screen(ing)?\b/, "CRISPR screening"],
-    [/\bmultiplex\b/, "Multiplex editing"],
-    [/\bcas12\b/, "Cas12 editing"],
-    [/\bcas9\b/, "Cas9 editing"],
-    [/\bcrispr\b/, "CRISPR"],
-  ];
-
-  return uniqueStrings(
-    pairs
-      .filter(([pattern]) => pattern.test(text))
-      .map(([, label]) => label),
-  );
-}
-
-function buildPaperKeywords(input: {
-  title: string;
-  abstract: string;
-  journal: string;
-  authors: string[];
-  organisms: string[];
-  editorTypes: string[];
-}) {
-  const tokens = [
-    ...input.editorTypes,
-    ...input.organisms,
-    input.journal,
-    ...input.authors,
-  ];
-
-  const text = `${input.title} ${input.abstract}`;
-  const geneLikeTokens = text.match(/\b[A-Z0-9-]{3,8}\b/g) ?? [];
-
-  return uniqueStrings([...tokens, ...geneLikeTokens].map(stripMarkup));
-}
-
 function buildSourceUrl(source: LiteratureSource, paper: { doi?: string; pmid?: string; url?: string }, sourceId?: string) {
   if (paper.url) {
     return paper.url;
@@ -297,100 +200,6 @@ function buildSourceUrl(source: LiteratureSource, paper: { doi?: string; pmid?: 
   }
 
   return undefined;
-}
-
-function calculateSignalScore(paper: Omit<CollectedPaper, "signalScore">) {
-  if (paper.primarySource === "mock" && paper.appPaperId) {
-    const fallbackPaper = papers.find((item) => item.id === paper.appPaperId);
-    if (fallbackPaper) {
-      return fallbackPaper.compositeScore;
-    }
-  }
-
-  let score = 32;
-
-  if (paper.abstract) {
-    score += 14;
-  }
-
-  if (paper.doi) {
-    score += 12;
-  }
-
-  if (paper.pmid) {
-    score += 8;
-  }
-
-  score += Math.min(12, paper.authors.length * 3);
-  score += Math.min(10, paper.organisms.length * 4);
-  score += Math.min(12, paper.editorTypes.length * 4);
-
-  if (paper.journal) {
-    score += journals.some((journal) => canonicalizeJournal(journal.name) === canonicalizeJournal(paper.journal)) ? 10 : 4;
-  }
-
-  if (paper.sources.length > 1) {
-    score += 10;
-  }
-
-  if (paper.publishedAt) {
-    const ageInDays = Math.max(0, Math.round((Date.now() - new Date(paper.publishedAt).getTime()) / 86_400_000));
-
-    if (ageInDays <= 180) {
-      score += 12;
-    } else if (ageInDays <= 365) {
-      score += 7;
-    } else {
-      score += 2;
-    }
-  }
-
-  return Math.min(100, Math.round(score));
-}
-
-function createCollectedPaper(input: Omit<CollectedPaper, "id" | "normalizedTitle" | "keywords" | "signalScore">) {
-  const normalizedTitle = normalizeTitle(input.title);
-  const paper: Omit<CollectedPaper, "signalScore"> = {
-    ...input,
-    id: `${input.primarySource}-${input.sourceIds[input.primarySource] ?? normalizedTitle.slice(0, 24)}`,
-    normalizedTitle,
-    keywords: buildPaperKeywords(input),
-  };
-
-  return {
-    ...paper,
-    signalScore: calculateSignalScore(paper),
-  };
-}
-
-function parseAuthorList(rawAuthors: Array<{ name?: string; authname?: string; given?: string; family?: string }> | undefined) {
-  if (!rawAuthors) {
-    return [];
-  }
-
-  return uniqueStrings(
-    rawAuthors
-      .map((author) => author.name ?? author.authname ?? [author.given, author.family].filter(Boolean).join(" "))
-      .filter(Boolean)
-      .map(stripMarkup),
-  );
-}
-
-async function fetchJson<T>(url: URL, source: Exclude<LiteratureSource, "mock">) {
-  const response = await fetch(url, {
-    headers: {
-      accept: "application/json",
-      "user-agent": "GeneEditRadar/0.1",
-    },
-    next: { revalidate: 1800 },
-    signal: AbortSignal.timeout(API_TIMEOUT_MS),
-  });
-
-  if (!response.ok) {
-    throw new Error(`${source} returned ${response.status}`);
-  }
-
-  return (await response.json()) as T;
 }
 
 function buildSearchTerms() {
