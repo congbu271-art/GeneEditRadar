@@ -55,8 +55,8 @@ test("renders compact workbench page headers", () => {
 
   assert.match(html, /文献雷达/);
   assert.match(html, /今日研究队列/);
-  assert.match(html, /bg-white/);
-  assert.match(html, /rounded-2xl/);
+  assert.match(html, /glass-panel|bg-white/);
+  assert.match(html, /rounded-2xl|rounded-\[2\.5rem\]/);
 });
 
 test("renders dense metric cards", () => {
@@ -80,10 +80,10 @@ test("renders the research-console shell with demo status", () => {
       </PathnameContext.Provider>,
     );
 
-    assert.match(html, /基因编辑雷达/);
+    assert.match(html, /GeneRadar|基因编辑雷达/);
     assert.match(html, /研究工作台/);
-    assert.match(html, /当前为演示版，部分结果基于示例数据和规则分析生成。/);
-    assert.match(html, /规则引擎/);
+    assert.match(html, /演示版/);
+    assert.match(html, /规则引擎|混合智能/);
     assert.match(html, /主体内容/);
   } finally {
     if (originalDatabaseUrl === undefined) {

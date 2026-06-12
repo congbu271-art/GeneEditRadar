@@ -506,20 +506,6 @@ function chooseBestString(values: Array<string | undefined>) {
   return values.filter(Boolean).sort((left, right) => (right?.length ?? 0) - (left?.length ?? 0))[0];
 }
 
-function toExtractionSourcePaper(paper: CollectedPaper): ExtractionSourcePaper {
-  return {
-    id: paper.id,
-    title: paper.title,
-    abstract: paper.abstract,
-    journal: paper.journal,
-    authors: paper.authors,
-    publishedAt: paper.publishedAt,
-    organisms: paper.organisms,
-    editorTypes: paper.editorTypes,
-    appPaperId: paper.appPaperId,
-  };
-}
-
 async function fetchUnpaywallOA(doi: string): Promise<string | null> {
   const email = process.env.UNPAYWALL_EMAIL || "team@geneeditradar.demo";
   const url = new URL(`https://api.unpaywall.org/v2/${doi}`);

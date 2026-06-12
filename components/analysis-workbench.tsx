@@ -44,6 +44,11 @@ export { getDefaultResultTab, getResultSectionSequence } from "@/lib/analyze-ui-
 
 const DEV_MODE = process.env.NODE_ENV === "development";
 
+const workbenchCardClass = "overflow-hidden border-slate-200/80 bg-white";
+const panelClass = "rounded-2xl border border-slate-200 bg-slate-50 p-4";
+const accentPanelClass = "rounded-2xl border border-cyan-200 bg-cyan-50 p-4";
+const softPanelClass = "rounded-2xl border border-slate-200 bg-white p-4";
+
 const ReliabilityBadge = memo(function ReliabilityBadge({ label }: { label: string }) {
   const variant =
     label === "元数据" ? "secondary" : label === "规则解析" ? "default" : label === "启发式评分" ? "warning" : "success";
