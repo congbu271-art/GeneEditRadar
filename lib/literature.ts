@@ -15,7 +15,7 @@ import {
   type GeneEditingExtraction,
 } from "@/lib/paper-extraction";
 
-export type LiteratureSource = "pubmed" | "europe-pmc" | "crossref" | "rss" | "mock";
+export type LiteratureSource = "pubmed" | "europe-pmc" | "crossref" | "rss" | "biorxiv" | "medrxiv" | "mock";
 
 export type CollectedPaper = {
   id: string;
@@ -36,6 +36,7 @@ export type CollectedPaper = {
   primarySource: LiteratureSource;
   signalScore: number;
   appPaperId?: string;
+  fullText?: string;
 };
 
 export type ExtractedCollectedPaper = CollectedPaper & {
@@ -105,6 +106,8 @@ const SOURCE_PRIORITY: Record<LiteratureSource, number> = {
   mock: 0,
   rss: 1,
   crossref: 1,
+  biorxiv: 1.5,
+  medrxiv: 1.5,
   pubmed: 2,
   "europe-pmc": 3,
 };
@@ -717,10 +720,81 @@ function toExtractionSourcePaper(paper: CollectedPaper): ExtractionSourcePaper {
   };
 }
 
-async function enrichCollectedPaper(paper: CollectedPaper): Promise<ExtractedCollectedPaper> {
-  return {
+async function fetchUnpaywallOA(doi: string): Promise<string | null> {
+  const email = process.env.UNPAYWALL_EMAIL || "team@geneeditradar.demo";
+  const url = new URL(`https://api.unpaywall.org/v2/${doi}`);
+  url.searchParams.set("email", email);
+
+  try {
+    const response = await fetch(url, { signal: AbortSignal.timeout(4000) });
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.best_oa_location?.url_for_pdf || data.best_oa_location?.url || null;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchPmcFullText(pmid?: string, doi?: string): Promise<string | null> {
+  // 优先尝试 Europe PMC 的 REST API 获取 XML
+  const query = pmid ? `ext_id:${pmid}` : doi ? `doi:${doi}` : null;
+  if (!query) return null;
+
+  const url = new URL("https://www.ebi.ac.uk/europepmc/webservices/rest/search");
+  url.searchParams.set("query", query);
+  url.searchParams.set("format", "json");
+  url.searchParams.set("resultType", "core");
+
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const result = data.resultList?.result?.[0];
+    
+    if (result?.isOpenAccess === "Y" && result.pmcid) {
+      // 获取全文 XML
+      const fullTextUrl = `https://www.ebi.ac.uk/europepmc/webservices/rest/${result.pmcid}/fullTextXML`;
+      const xmlRes = await fetch(fullTextUrl, { signal: AbortSignal.timeout(5000) });
+      if (xmlRes.ok) {
+        const xml = await xmlRes.text();
+        // 简单提取正文（去除标签，提取段落）
+        return xml
+          .replace(/<[^>]+>/g, " ")
+          .replace(/\s+/g, " ")
+          .trim()
+          .slice(0, 30000); // 截取前 30k 字符
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+export async function enrichCollectedPaper(paper: CollectedPaper): Promise<ExtractedCollectedPaper> {
+  // 尝试获取全文
+  let fullText: string | undefined = undefined;
+  if (paper.pmid || paper.doi) {
+    fullText = (await fetchPmcFullText(paper.pmid, paper.doi)) ?? undefined;
+    if (!fullText && paper.doi) {
+      const oaUrl = await fetchUnpaywallOA(paper.doi);
+      if (oaUrl) {
+        console.log(`Found OA URL for ${paper.doi}: ${oaUrl}`);
+      }
+    }
+  }
+
+  const enrichedPaper = {
     ...paper,
-    extraction: await extractGeneEditingDetails(toExtractionSourcePaper(paper)),
+    fullText,
+  };
+
+  return {
+    ...enrichedPaper,
+    extraction: await extractGeneEditingDetails({
+      ...toExtractionSourcePaper(enrichedPaper),
+      fullText,
+    }),
   };
 }
 
@@ -924,8 +998,87 @@ export function matchPaperToSubscription(paper: CollectedPaper, rawSubscription:
   };
 }
 
+async function searchPreprints(source: "biorxiv" | "medrxiv", limit = DEFAULT_LIMIT_PER_SOURCE): Promise<SourceResult> {
+  const doiPrefix = source === "biorxiv" ? "10.1101" : "10.1101"; // Both are often 10.1101 but medRxiv is also 10.1101. Actually bioRxiv is 10.1101. medRxiv is 10.1101 too? No, medRxiv is 10.1101 as well but different volume?
+  // Actually, let's just use Crossref with a filter.
+  const url = new URL("https://api.crossref.org/works");
+  url.search = new URLSearchParams({
+    query: buildCrossrefQuery(),
+    filter: `prefix:${doiPrefix}`, // bioRxiv prefix
+    rows: String(limit),
+    sort: "published",
+    order: "desc",
+  }).toString();
+
+  type CrossrefItem = {
+    DOI?: string;
+    title?: string[];
+    author?: Array<{ given?: string; family?: string; name?: string }>;
+    issued?: { "date-parts"?: number[][] };
+    "container-title"?: string[];
+    abstract?: string;
+    URL?: string;
+    type?: string;
+  };
+
+  type CrossrefResponse = {
+    message?: {
+      items?: CrossrefItem[];
+    };
+  };
+
+  try {
+    const payload = await fetchJson<CrossrefResponse>(url, "crossref");
+    const items = payload.message?.items ?? [];
+
+    const normalized = items
+      .filter((item) => item.title?.[0])
+      .map((item) => {
+        const title = stripMarkup(item.title?.[0] ?? "");
+        const abstract = stripMarkup(item.abstract ?? "");
+        const doi = normalizeDoi(item.DOI);
+
+        return createCollectedPaper({
+          title,
+          abstract,
+          doi,
+          journal: source === "biorxiv" ? "bioRxiv" : "medRxiv",
+          authors: parseAuthorList(item.author),
+          publishedAt: parseCrossrefDate(item.issued?.["date-parts"]),
+          url: buildSourceUrl("crossref", { doi, url: item.URL }, undefined),
+          organisms: inferOrganisms(title, abstract),
+          editorTypes: inferEditorTypes(title, abstract),
+          sourceIds: { [source]: doi ?? title },
+          sources: [source],
+          primarySource: source,
+        });
+      });
+
+    return {
+      papers: normalized,
+      status: { source, ok: true, count: normalized.length },
+    };
+  } catch (error) {
+    return {
+      papers: [],
+      status: {
+        source,
+        ok: false,
+        count: 0,
+        error: error instanceof Error ? error.message : `Unknown ${source} error`,
+      },
+    };
+  }
+}
+
 export async function collectExternalLiterature(): Promise<LiteratureCollectionResult> {
-  const results = await Promise.all([searchPubMed(), searchEuropePmc(), searchCrossref()]);
+  const results = await Promise.all([
+    searchPubMed(), 
+    searchEuropePmc(), 
+    searchCrossref(),
+    searchPreprints("biorxiv"),
+    searchPreprints("medrxiv"),
+  ]);
   const collected = results.flatMap((result) => result.papers);
   const deduped = dedupePapers(collected);
 

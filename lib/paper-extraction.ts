@@ -36,6 +36,7 @@ export type ExtractionSourcePaper = {
   organisms: string[];
   editorTypes: string[];
   appPaperId?: string;
+  fullText?: string;
 };
 
 const LLM_REFINABLE_FIELDS: RefinableExtractionField[] = [
@@ -459,6 +460,7 @@ async function maybeRefineWithLlm(sourcePaper: ExtractionSourcePaper, baseExtrac
       paper: {
         title: sourcePaper.title,
         abstract: sourcePaper.abstract,
+        fullText: sourcePaper.fullText ? sourcePaper.fullText.slice(0, 15000) + "..." : undefined,
         journal: sourcePaper.journal,
         authors: sourcePaper.authors,
         organisms: sourcePaper.organisms,
@@ -481,11 +483,11 @@ async function maybeRefineWithLlm(sourcePaper: ExtractionSourcePaper, baseExtrac
 
   const parsed = await llmJson({
     system:
-      "You extract structured gene-editing paper facts from only the provided paper metadata. Never use outside knowledge. If a field is absent or uncertain, return exactly 'not reported'. Be especially conservative for limitations and follow-up opportunities. Respond with a single JSON object matching the requested fields.",
-    user: `Extract the gene-editing fields as JSON from the following paper data:\n${userPayload}`,
+      "You extract structured gene-editing paper facts from the provided paper metadata and full text. Never use outside knowledge. If a field is absent or uncertain, return exactly 'not reported'. Be conservative. Respond with a single JSON object matching the requested fields.",
+    user: `Extract the gene-editing fields as JSON from the following paper data (including full text if provided):\n${userPayload}`,
     schema: geneEditingExtractionSchema,
-    maxTokens: 700,
-    timeoutMs: 8_000,
+    maxTokens: 1000,
+    timeoutMs: 15_000,
   });
 
   if (!parsed) {

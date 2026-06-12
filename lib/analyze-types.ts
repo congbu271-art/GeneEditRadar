@@ -79,6 +79,11 @@ export type AnalyzeIdea = {
   warning?: string;
   riskWarnings: string[];
   reliabilityLabel: "AI生成假设";
+  evolutionAnalysis?: {
+    establishedPaths: string[];
+    identifiedGaps: string[];
+    innovationPathSummary: string;
+  };
 };
 
 export type AnalyzeEvaluation = {

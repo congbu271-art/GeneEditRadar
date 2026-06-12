@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { ArrowUpRight, CheckCircle2, LoaderCircle, Sparkles } from "lucide-react";
+import { ArrowUpRight, CheckCircle2, LoaderCircle, Sparkles, Network, TrendingUp } from "lucide-react";
 
 import { PageHeader } from "@/components/page-header";
 import { ScoreBars } from "@/components/score-bars";
@@ -1113,6 +1113,29 @@ export function AnalysisWorkbench() {
                       <DetailPanel label="优先级" value={idea.priority} />
                       <DetailPanel label="推荐期刊层级" value={idea.suggestedJournalTier} />
                     </div>
+                    {idea.evolutionAnalysis && (
+                      <div className={cn(panelClass, "border-cyan-100 bg-cyan-50/30")}>
+                        <div className="flex items-center gap-2 mb-3">
+                          <Network className="h-4 w-4 text-cyan-600" />
+                          <p className="font-medium text-slate-950">技术演进脉络 (基于真实引文图谱)</p>
+                        </div>
+                        <p className="text-sm text-slate-700 leading-relaxed mb-4">{idea.evolutionAnalysis.innovationPathSummary}</p>
+                        <div className="grid md:grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-xs font-semibold text-slate-500 mb-2 flex items-center gap-1.5"><TrendingUp className="h-3 w-3" /> 已确立的研究分支 (红海)</p>
+                            <ul className="list-disc pl-4 space-y-1 text-sm text-slate-600">
+                              {idea.evolutionAnalysis.establishedPaths.map((path, i) => <li key={i}>{path}</li>)}
+                            </ul>
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold text-cyan-700 mb-2 flex items-center gap-1.5"><Sparkles className="h-3 w-3" /> 识别出的演进空白 (蓝海)</p>
+                            <ul className="list-disc pl-4 space-y-1 text-sm text-cyan-800">
+                              {idea.evolutionAnalysis.identifiedGaps.map((gap, i) => <li key={i}>{gap}</li>)}
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                     <div className={panelClass}>
                       <p className="font-medium text-slate-950">创新逻辑</p>
                       <p className="mt-2">{idea.innovationLogic}</p>

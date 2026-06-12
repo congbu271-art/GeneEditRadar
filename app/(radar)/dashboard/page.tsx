@@ -42,13 +42,13 @@ export default async function DashboardPage() {
         description="这个最小可用版将内置模拟基因编辑文献组织成一套可用的发现流程：高信号初筛、订阅监测、选题捕捉与轻量级评估。"
         actions={
           <>
-            <Button asChild>
+            <Button asChild variant="secondary" className="bg-cyan-600/10 text-cyan-700 hover:bg-cyan-600/20 border-none shadow-none font-semibold">
               <Link href="/papers">
                 查看文献
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </Button>
-            <Button asChild variant="outline">
+            <Button asChild variant="outline" className="rounded-xl border-slate-200 hover:bg-slate-50 transition-all font-semibold">
               <Link href="/ideas">
                 查看选题
                 <BrainCircuit className="h-4 w-4" />

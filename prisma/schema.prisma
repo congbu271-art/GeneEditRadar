@@ -152,6 +152,7 @@ model Paper {
   geneTargets        GeneTarget[]
   topics             Topic[]
   ideas              Idea[]
+  embedding          Unsupported("vector(1536)")?
 
   @@index([publishedAt])
   @@index([compositeScore])
@@ -246,6 +247,9 @@ model LiteraturePaper {
   sourceRecords          LiteratureSourceRecord[]
   subscriptionMatches    SubscriptionMatch[]
   deliveredNotifications DeliveredNotification[]
+  embedding              Unsupported("vector(1536)")?
+  hasFullText            Boolean                  @default(false)
+  fullText               String?
 
   @@index([publishedAt])
   @@index([lastSeenAt])

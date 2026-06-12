@@ -43,10 +43,12 @@ const config: Config = {
         sm: "calc(var(--radius) - 4px)",
       },
       boxShadow: {
-        glow: "0 22px 60px -28px rgba(14, 165, 233, 0.65)",
+        glow: "0 0 20px -5px hsla(191, 91%, 36%, 0.3)",
+        soft: "0 10px 40px -10px rgba(0, 0, 0, 0.05)",
       },
       backgroundImage: {
-        grid: "linear-gradient(to right, rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.08) 1px, transparent 1px)",
+        grid: "linear-gradient(to right, rgba(0,0,0,0.02) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,0.02) 1px, transparent 1px)",
+        "bio-gradient": "linear-gradient(135deg, hsla(191, 91%, 36%, 0.1), hsla(262, 83%, 58%, 0.1))",
       },
     },
   },

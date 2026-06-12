@@ -1,3 +1,7 @@
+import { average, formatDate as formatUtilDate } from "@/lib/utils";
+import { isLlmEnabled, llmJson } from "@/lib/llm";
+import { z } from "zod";
+import type { SemanticScholarCitation } from "@/lib/semantic-scholar";
 import { geneTargets, journals, papers, topics, type RadarPaper } from "@/lib/mock-data";
 import {
   NOT_REPORTED,
@@ -16,6 +20,12 @@ export const RESEARCH_IDEA_TYPES = [
 ] as const;
 
 export type ResearchIdeaType = (typeof RESEARCH_IDEA_TYPES)[number];
+
+export type EvolutionAnalysis = {
+  establishedPaths: string[];
+  identifiedGaps: string[];
+  innovationPathSummary: string;
+};
 
 export type GeneratedResearchIdea = {
   id: string;
@@ -36,6 +46,7 @@ export type GeneratedResearchIdea = {
   minimumExperimentalPackage: string[];
   additionalExperiments: string[];
   classification: string;
+  evolutionAnalysis?: EvolutionAnalysis;
 };
 
 export type IdeaSeedPaper = {
@@ -85,6 +96,102 @@ export type GeneEditingIdeaEvaluation = {
   warning?: string;
   rationale: string[];
 };
+
+const researchIdeaWithEvolutionSchema = z.object({
+  evolutionAnalysis: z.object({
+    establishedPaths: z.array(z.string()),
+    identifiedGaps: z.array(z.string()),
+    innovationPathSummary: z.string(),
+  }),
+  ideas: z.array(z.object({
+    title: z.string(),
+    thesis: z.string(),
+    ideaType: z.enum(RESEARCH_IDEA_TYPES),
+    score: z.number().min(0).max(100),
+    articleTypeHint: z.string(),
+    journalTierHint: z.string(),
+    minimumExperimentalPackage: z.array(z.string()),
+    additionalExperiments: z.array(z.string()),
+    customer: z.string(),
+    risk: z.string(),
+    moat: z.string(),
+  }))
+});
+
+/**
+ * 基于引文演进生成科研课题
+ */
+export async function generateResearchIdeasWithCitations(
+  paper: IdeaSeedPaper,
+  extraction: GeneEditingExtraction,
+  citations: SemanticScholarCitation[]
+): Promise<GeneratedResearchIdea[]> {
+  if (!isLlmEnabled()) {
+    // 如果 LLM 未启用，回退到规则生成
+    return generateIdeasForSeedPaper(paper, extraction);
+  }
+
+  const citationContext = citations.map((c, i) => 
+    `[引用 ${i+1}] 标题: ${c.title}\n年份: ${c.year}\n影响力: ${c.isInfluential ? '高' : '一般'}\n摘要: ${c.abstract}`
+  ).join("\n\n");
+
+  const systemPrompt = `你是一个资深的“风险科学家”和基因编辑技术情报专家。
+你的任务是根据一篇 [种子文献] 及其 [后续引用文献列表]，分析该技术的演进路线，并推演未来的蓝海科研方向。
+
+**核心演进与迁移法则 (严格遵守)：**
+1. **跨界法则：** 基因编辑技术（如 PE、BE、靶向递送等）通常首先在动物/哺乳动物细胞中验证。随后会向植物（尤其是模式植物如水稻、拟南芥）迁移。极少有技术从植物反向迁移回动物。
+2. **植物界内法则：** 在植物中，技术验证通常遵循：模式植物（水稻、拟南芥） -> 易转化作物（番茄） -> 难转化/重要经济作物（大豆、高粱、玉米、丹参等）。
+3. **推演逻辑：** 衍生选题应该顺应这个迁移方向，例如：如果文献在水稻中做了 PE，下一步应该是去大豆或高粱中做；如果文献在动物中做了新工具，下一步是向水稻等模式植物迁移。
+
+第一步：技术演进分析 (Evolution Analysis)
+- 识别出同行已经在哪些方向（Paths）进行了深度探索（如：物种迁移、载体优化等）。
+- 识别出目前的文献网络中尚未覆盖或提到但未解决的空白点（Gaps），特别是尚未跨越的物种壁垒。
+
+第二步：课题推演 (Idea Generation)
+- 基于识别出的空白点，生成 3 个具有高学术价值和转化潜力的衍生研究课题。
+- 确保课题顺应上述的“核心演进与迁移法则”，是合乎逻辑的“下一跳”。
+
+**格式要求：**
+- 所有的文字输出（包括 title, thesis, customer, risk, moat，实验包等）**必须完全使用中文**。
+- 请输出 JSON 格式。`;
+
+  const userPrompt = `[种子文献]:
+标题: ${paper.title}
+摘要: ${paper.abstract}
+工具: ${extraction.editingTool}
+物种: ${extraction.organism}
+
+[后续引用文献列表]:
+${citationContext || "暂无引用数据，请基于种子文献本身的局限性进行推演。"}
+
+请基于以上数据，完成演进分析并生成 3 个新颖课题。务必全部使用中文输出。`;
+
+  const parsed = await llmJson({
+    system: systemPrompt,
+    user: userPrompt,
+    schema: researchIdeaWithEvolutionSchema,
+    maxTokens: 3000,
+    timeoutMs: 30000,
+  });
+
+  if (!parsed) {
+    return generateIdeasForSeedPaper(paper, extraction);
+  }
+
+  return parsed.ideas.map((item: any, index: number) => {
+    const slug = slugify(`${paper.slug}-${item.ideaType}-${index}`);
+    return {
+      id: `idea-evolution-${slug}`,
+      slug,
+      ...item,
+      paperId: paper.id,
+      stage: item.score >= 84 ? "High priority" : item.score >= 72 ? "Promising" : "Speculative",
+      classification: formatIdeaTypeLabel(item.ideaType),
+      evolutionAnalysis: parsed.evolutionAnalysis,
+      wedge: item.minimumExperimentalPackage[0],
+    };
+  });
+}
 
 const DEFAULT_IDEA_TYPE_PRIORITY: ResearchIdeaType[] = [
   "tool transfer",
@@ -288,82 +395,83 @@ function getPackageForIdeaType(
     case "tool transfer":
       return {
         minimumExperimentalPackage: [
-          `Rebuild the ${extraction.editingType.toLowerCase()} workflow against a second target beyond ${gene}.`,
-          `Show matched on-target editing and a trait-linked functional readout in the transfer setting.`,
-          `Benchmark portability against the original ${journalName} source-paper conditions.`,
+          `在 ${gene} 之外的第二个靶点上重建 ${extraction.editingType.toLowerCase()} 流程。`,
+          `在新的迁移体系中展示一致的在靶编辑效率与相关功能读出。`,
+          `以原 ${journalName} 论文条件为基准评估工具的可移植性。`,
         ],
         additionalExperiments: [
-          "Add durability measurements across at least two timepoints.",
-          "Run off-target or transcriptomic safety profiling in the new context.",
-          "Compare transfer performance against a simpler baseline editor or delivery setup.",
+          "在至少两个时间点增加持久性测量。",
+          "在新环境中进行脱靶或转录组安全性分析。",
+          "与更简单的基线编辑器或递送系统比较迁移表现。",
         ],
       };
     case "organism transfer":
       return {
         minimumExperimentalPackage: [
-          `Replicate the core ${paper.diseaseArea.toLowerCase()} edit in ${getOrganismTransferTarget(paper)}.`,
-          "Measure editing rate, phenotype rescue, and exposure in the new organism system.",
-          "Bridge the organism shift with matched guide and dosing controls.",
+          `在 ${getOrganismTransferTarget(paper)} 中复现核心的 ${paper.diseaseArea.toLowerCase()} 编辑。`,
+          "在新的物种系统中测量编辑效率、表型恢复与体内暴露量。",
+          "通过匹配的 guide 与剂量对照来跨越物种迁移的鸿沟。",
         ],
         additionalExperiments: [
-          "Add repeat-dose or longitudinal follow-up if the new model supports it.",
-          "Compare immune activation or inflammatory burden across organisms.",
-          "Use orthogonal molecular validation for any shifted phenotype signal.",
+          "如果新模型支持，增加重复给药或纵向随访。",
+          "比较不同物种间的免疫激活或炎症负担。",
+          "使用正交分子验证来确认任何表型信号的转移。",
         ],
       };
     case "delivery optimization":
       return {
         minimumExperimentalPackage: [
-          `Optimize ${extraction.deliveryMethod !== NOT_REPORTED ? extraction.deliveryMethod : paper.modality} for ${getDeliveryOptimizationFocus(extraction.deliveryMethod, paper)}.`,
-          "Quantify biodistribution, editing rate, and functional phenotype together.",
-          "Benchmark the optimized delivery against the source-paper dosing condition.",
+          `针对 ${getDeliveryOptimizationFocus(extraction.deliveryMethod, paper)} 优化 ${extraction.deliveryMethod !== NOT_REPORTED ? extraction.deliveryMethod : paper.modality} 递送。`,
+          "同步量化生物分布、编辑效率与功能表型。",
+          "以原论文给药条件为基准评估优化后的递送方案。",
         ],
         additionalExperiments: [
-          "Stress-test repeat dosing or redosing compatibility.",
-          "Add payload integrity and tissue-selective expression measurements.",
-          "Compare safety markers against a clinically familiar delivery control.",
+          "压力测试重复给药或二次给药的兼容性。",
+          "增加有效载荷完整性与组织特异性表达测量。",
+          "与临床常见的递送对照比较安全性指标。",
         ],
       };
     case "editor optimization":
       return {
         minimumExperimentalPackage: [
-          `Engineer the ${extraction.editingTool} around ${getEditorOptimizationFocus(extraction.editingTool, paper)}.`,
-          "Measure edit purity, on-target efficiency, and phenotype effect in the lead model.",
-          "Compare the optimized editor head-to-head with the source configuration.",
+          `围绕 ${getEditorOptimizationFocus(extraction.editingTool, paper)} 重新设计 ${extraction.editingTool}。`,
+          "在主要模型中测量编辑纯度、在靶效率与表型效应。",
+          "将优化后的编辑器与原始配置进行直接 head-to-head 比较。",
         ],
         additionalExperiments: [
-          "Profile editing window or bystander editing outcomes.",
-          "Add expression kinetics or payload-size measurements.",
-          "Test whether the optimized editor preserves efficacy under lower dose.",
+          "分析编辑窗口或旁观者编辑结果。",
+          "增加表达动力学或载荷大小的测量。",
+          "测试优化后的编辑器在较低剂量下是否能保持疗效。",
         ],
       };
     case "trait application":
       return {
         minimumExperimentalPackage: [
-          `Apply the same platform to ${getAdjacentTrait(paper)} with a clearly defined phenotype endpoint.`,
-          "Show on-target editing together with a disease-relevant rescue or suppression readout.",
-          "Include a direct comparator against the original trait context or target class.",
+          `将同一平台应用于 ${getAdjacentTrait(paper)} 并明确界定表型终点。`,
+          "展示在靶编辑以及与疾病相关的表型恢复或抑制读出。",
+          "包含与原始性状背景或目标类别的直接对照。",
         ],
         additionalExperiments: [
-          "Add dose-response or guide-selection screens around the new trait.",
-          "Measure durability and reversibility where clinically relevant.",
-          "Run safety profiling tailored to the new disease context.",
+          "围绕新性状增加剂量反应或 guide 筛选。",
+          "在临床相关的情况下测量持久性与可逆性。",
+          "进行针对新疾病背景的安全性分析。",
         ],
       };
     case "off-target reduction":
       return {
         minimumExperimentalPackage: [
-          `Build a reduced-risk version of the ${extraction.editingTool} workflow using guide, payload, or expression-timing controls.`,
-          "Measure on-target editing together with off-target, inflammation, or biodistribution readouts.",
-          "Demonstrate that specificity gains do not erase the phenotype signal.",
+          `通过 guide、载荷或表达时机控制，构建风险降低版的 ${extraction.editingTool} 流程。`,
+          "同步测量在靶编辑与脱靶、炎症或生物分布读出。",
+          "证明特异性的提升并没有抹杀表型信号。",
         ],
         additionalExperiments: [
-          "Add orthogonal off-target confirmation such as targeted sequencing or unbiased profiling.",
-          "Compare transient versus persistent editor exposure.",
-          "Test the specificity strategy in a second guide or target context.",
+          "增加正交脱靶确认（如靶向深度测序或无偏倚分析）。",
+          "比较瞬时与持续的编辑器暴露差异。",
+          "在第二个 guide 或靶点背景中测试特异性策略。",
         ],
       };
   }
+
 }
 
 function selectIdeaTypesForPaper(paper: IdeaSeedPaper, extraction: GeneEditingExtraction) {
@@ -417,12 +525,12 @@ function buildIdeaDraft(paper: IdeaSeedPaper, extraction: GeneEditingExtraction,
   switch (ideaType) {
     case "tool transfer":
       return {
-        title: `Transfer ${tool} from ${gene} into ${getAdjacentTrait(paper)}`,
-        thesis: `Use the source paper's ${delivery} playbook to test whether the same ${tool} architecture can unlock publishable editing performance in ${getAdjacentTrait(paper)} instead of staying confined to ${trait.toLowerCase()}.`,
-        customer: "Best first team: translational editing labs with a validated source-paper assay and one adjacent disease model.",
+        title: `将 ${tool} 从 ${gene} 迁移至 ${getAdjacentTrait(paper)}`,
+        thesis: `利用原论文的 ${delivery} 策略，测试同一 ${tool} 架构是否能在 ${getAdjacentTrait(paper)} 中解锁具有发表价值的编辑表现，而不是局限于 ${trait.toLowerCase()}。`,
+        customer: "最匹配团队：拥有成熟的原型分析方法和相邻疾病模型的转化编辑实验室。",
         wedge: packagePlan.minimumExperimentalPackage[0],
-        moat: "Why it matters: portability would show that the paper's core advance is a reusable platform move rather than a one-target anecdote.",
-        risk: "Primary risk: the effect could depend more on tissue context than on the transferred editing architecture.",
+        moat: "核心价值：可移植性将证明原论文的核心进展是一个可复用的平台级突破，而非单靶点的偶然发现。",
+        risk: "主要风险：编辑效果可能更多地依赖于特定组织环境，而不是迁移后的编辑架构。",
         topicSlug: topic?.slug,
         articleTypeHint,
         minimumExperimentalPackage: packagePlan.minimumExperimentalPackage,
@@ -430,12 +538,12 @@ function buildIdeaDraft(paper: IdeaSeedPaper, extraction: GeneEditingExtraction,
       };
     case "organism transfer":
       return {
-        title: `Port ${gene} editing into ${getOrganismTransferTarget(paper)}`,
-        thesis: `Translate the paper's editing logic from ${paper.organisms.join(", ").toLowerCase()} models into ${getOrganismTransferTarget(paper)} to show whether the biology and delivery logic survive a harder translational organism jump.`,
-        customer: "Best first team: groups that already control the original model and one higher-fidelity validation organism.",
+        title: `将 ${gene} 编辑引入 ${getOrganismTransferTarget(paper)}`,
+        thesis: `将该论文的编辑逻辑从 ${paper.organisms.join(", ").toLowerCase()} 模型迁移到 ${getOrganismTransferTarget(paper)}，以验证其生物学和递送逻辑能否承受更难的物种跨越。`,
+        customer: "最匹配团队：已经掌握原始模型，并具备更高阶（如大动物/作物）验证体系的团队。",
         wedge: packagePlan.minimumExperimentalPackage[0],
-        moat: "Why it matters: organism transfer is often the cleanest bridge from elegant editing chemistry to a paper with real translational weight.",
-        risk: "Primary risk: dosing, immune tone, or tissue access can collapse performance during the organism step-up.",
+        moat: "核心价值：物种迁移通常是将精妙的编辑化学转化为具有真正转化价值的论文的最清晰路径。",
+        risk: "主要风险：在物种升级过程中，剂量、免疫反应或组织屏障可能导致编辑性能崩溃。",
         topicSlug: topic?.slug,
         articleTypeHint,
         minimumExperimentalPackage: packagePlan.minimumExperimentalPackage,
@@ -443,12 +551,12 @@ function buildIdeaDraft(paper: IdeaSeedPaper, extraction: GeneEditingExtraction,
       };
     case "delivery optimization":
       return {
-        title: `Optimize ${delivery} for ${getDeliveryOptimizationFocus(extraction.deliveryMethod, paper)}`,
-        thesis: `Take the source paper's delivery frame and make it publishable as a standalone advance by improving ${getDeliveryOptimizationFocus(extraction.deliveryMethod, paper)} while preserving the same edit and phenotype signal.`,
-        customer: "Best first team: delivery engineering labs that can iterate formulations, biodistribution assays, and phenotype readouts quickly.",
+        title: `针对 ${getDeliveryOptimizationFocus(extraction.deliveryMethod, paper)} 优化 ${delivery}`,
+        thesis: `采用原论文的递送框架，通过改进 ${getDeliveryOptimizationFocus(extraction.deliveryMethod, paper)} 同时保持相同的编辑与表型信号，使其成为一篇独立的方法学突破文章。`,
+        customer: "最匹配团队：能够快速迭代配方、生物分布分析和表型读出的递送工程实验室。",
         wedge: packagePlan.minimumExperimentalPackage[0],
-        moat: "Why it matters: delivery improvements often create the fastest follow-on paper if the signal ties directly to dose, durability, or safety.",
-        risk: "Primary risk: better exposure metrics may not translate into a materially stronger phenotype package.",
+        moat: "核心价值：如果编辑信号与剂量、持久性或安全性直接相关，递送方案的改进往往能最快催生后续的高质量论文。",
+        risk: "主要风险：更好的体内暴露指标未必能转化为实质性增强的表型结果。",
         topicSlug: topic?.slug ?? "delivery",
         articleTypeHint,
         minimumExperimentalPackage: packagePlan.minimumExperimentalPackage,
@@ -456,12 +564,12 @@ function buildIdeaDraft(paper: IdeaSeedPaper, extraction: GeneEditingExtraction,
       };
     case "editor optimization":
       return {
-        title: `Engineer a sharper ${tool} for ${gene}`,
-        thesis: `Build an editor-optimization paper around ${getEditorOptimizationFocus(extraction.editingTool, paper)} so the study contributes a better-performing edit chemistry rather than only repeating the source phenotype.`,
-        customer: "Best first team: editor engineering groups with fast construct-build cycles and direct access to the source assay.",
+        title: `为 ${gene} 改造更敏锐的 ${tool}`,
+        thesis: `围绕 ${getEditorOptimizationFocus(extraction.editingTool, paper)} 构建一篇编辑器优化论文，使该研究贡献一种性能更好的编辑化学反应，而不仅仅是重复原始表型。`,
+        customer: "最匹配团队：具有快速载体构建周期并能直接访问原始表型分析的编辑器工程团队。",
         wedge: packagePlan.minimumExperimentalPackage[0],
-        moat: "Why it matters: editor-focused improvements can generalize across targets if specificity or payload advantages are real.",
-        risk: "Primary risk: editor gains may be too small or too context-specific to survive peer review as a distinct contribution.",
+        moat: "核心价值：如果特异性或有效载荷优势确凿，以编辑器为中心的改进可以推广到更多靶点。",
+        risk: "主要风险：编辑器的性能提升可能太小或过于依赖特定背景，难以作为独立贡献通过同行评审。",
         topicSlug: topic?.slug ?? "base-editing",
         articleTypeHint,
         minimumExperimentalPackage: packagePlan.minimumExperimentalPackage,
@@ -469,12 +577,12 @@ function buildIdeaDraft(paper: IdeaSeedPaper, extraction: GeneEditingExtraction,
       };
     case "trait application":
       return {
-        title: `Apply ${tool} to ${getAdjacentTrait(paper)}`,
-        thesis: `Use the paper as a starting point for a new trait application study that keeps the core editing modality but retunes the experimental package toward ${getAdjacentTrait(paper)} and a new phenotype endpoint.`,
-        customer: "Best first team: disease-focused labs looking for a faster way to reuse a proven editing chemistry in an adjacent indication.",
+        title: `将 ${tool} 应用于 ${getAdjacentTrait(paper)}`,
+        thesis: `以该论文为起点，开展新的性状应用研究，保留核心编辑模式，但将实验终点转向 ${getAdjacentTrait(paper)} 和新的表型。`,
+        customer: "最匹配团队：希望在相邻适应症中快速重用已验证编辑化学反应的疾病或农学实验室。",
         wedge: packagePlan.minimumExperimentalPackage[0],
-        moat: "Why it matters: strong trait transfer papers can create a new disease wedge without requiring an entirely new platform invention.",
-        risk: "Primary risk: the idea can look like a me-too application unless the phenotype or model upgrade is genuinely differentiated.",
+        moat: "核心价值：强大的性状迁移论文无需发明全新的平台，即可在新的疾病/农艺方向上建立据点。",
+        risk: "主要风险：除非表型或模型升级真正具有差异化，否则该思路容易被视为缺乏创新的 me-too 研究。",
         topicSlug: topic?.slug ?? "rare-disease",
         articleTypeHint,
         minimumExperimentalPackage: packagePlan.minimumExperimentalPackage,
@@ -482,12 +590,12 @@ function buildIdeaDraft(paper: IdeaSeedPaper, extraction: GeneEditingExtraction,
       };
     case "off-target reduction":
       return {
-        title: `Reduce off-target burden in ${tool} ${gene} editing`,
-        thesis: `Turn the source paper into a stronger safety story by redesigning the workflow around lower off-target or inflammatory burden while keeping the headline edit and phenotype signal intact.`,
-        customer: "Best first team: safety-focused translational labs that can combine editing assays with orthogonal specificity readouts.",
+        title: `降低 ${tool} 在 ${gene} 编辑中的脱靶负担`,
+        thesis: `通过重新设计围绕降低脱靶或炎症负担的工作流，同时保持主要的在靶编辑和表型信号完好无损，将原始论文转化为更强的安全性故事。`,
+        customer: "最匹配团队：注重安全性的转化实验室，能够将编辑分析与正交的特异性评估相结合。",
         wedge: packagePlan.minimumExperimentalPackage[0],
-        moat: "Why it matters: a credible specificity gain can raise publication quality and create a practical adoption argument at the same time.",
-        risk: "Primary risk: safety improvements may come at the cost of too much efficacy to support a compelling article.",
+        moat: "核心价值：可靠的特异性提升不仅能提高文章发表质量，还能同时创造实际的临床/田间应用理由。",
+        risk: "主要风险：安全性的改善可能是以牺牲过多的编辑效率为代价，导致无法支撑一篇有说服力的文章。",
         topicSlug: topic?.slug ?? "delivery",
         articleTypeHint,
         minimumExperimentalPackage: packagePlan.minimumExperimentalPackage,

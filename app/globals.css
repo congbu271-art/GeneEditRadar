@@ -3,24 +3,26 @@
 @tailwind utilities;
 
 :root {
-  --font-display: "Avenir Next", "Trebuchet MS", "Segoe UI", sans-serif;
-  --font-body: "Avenir Next", "Helvetica Neue", "Segoe UI", sans-serif;
-  --background: 210 40% 98%;
-  --foreground: 218 33% 16%;
+  --font-display: "Inter", "Avenir Next", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, sans-serif;
+  --background: 210 40% 99%;
+  --foreground: 222 47% 11%;
   --card: 0 0% 100%;
-  --card-foreground: 218 33% 16%;
-  --primary: 188 86% 38%;
+  --card-foreground: 222 47% 11%;
+  --primary: 191 91% 36%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 206 38% 94%;
-  --secondary-foreground: 218 33% 16%;
-  --muted: 211 32% 92%;
-  --muted-foreground: 215 16% 45%;
-  --accent: 161 64% 38%;
-  --accent-foreground: 0 0% 100%;
-  --border: 214 30% 86%;
-  --input: 214 30% 86%;
-  --ring: 188 86% 38%;
-  --radius: 0.875rem;
+  --secondary: 210 40% 96.1%;
+  --secondary-foreground: 222 47% 11.2%;
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+  --accent: 191 91% 36%;
+  --accent-foreground: 222 47% 11.2%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 214.3 31.8% 91.4%;
+  --input: 214.3 31.8% 91.4%;
+  --ring: 191 91% 36%;
+  --radius: 1.25rem;
 }
 
 * {
@@ -29,31 +31,69 @@
 
 html {
   scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
 }
 
 body {
   min-height: 100vh;
-  background:
-    linear-gradient(120deg, rgba(236, 254, 255, 0.92), rgba(248, 250, 252, 0.98) 38%, rgba(239, 246, 255, 0.94)),
-    linear-gradient(180deg, #f8fafc 0%, #eef6fb 100%);
+  background-color: hsl(var(--background));
+  background-image: 
+    radial-gradient(at 0% 0%, hsla(191, 91%, 36%, 0.05) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, hsla(262, 83%, 58%, 0.05) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, hsla(191, 91%, 36%, 0.05) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, hsla(262, 83%, 58%, 0.05) 0px, transparent 50%);
   color: hsl(var(--foreground));
   font-family: var(--font-body), sans-serif;
 }
 
 ::selection {
-  background: rgba(8, 145, 178, 0.18);
+  background: hsla(191, 91%, 36%, 0.2);
+  color: hsl(var(--foreground));
 }
 
 .font-display {
   font-family: var(--font-display), sans-serif;
+  letter-spacing: -0.02em;
 }
 
 .glass-panel {
-  background: rgba(255, 255, 255, 0.9);
-  border-color: rgba(226, 232, 240, 0.9);
-  box-shadow: 0 24px 80px -48px rgba(15, 23, 42, 0.34);
-  color: hsl(var(--foreground));
-  backdrop-filter: blur(20px);
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 
+    0 4px 6px -1px rgba(0, 0, 0, 0.02),
+    0 10px 15px -3px rgba(0, 0, 0, 0.03),
+    0 0 0 1px rgba(255, 255, 255, 0.4) inset;
+}
+
+.glass-panel-hover {
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-panel-hover:hover {
+  background: rgba(255, 255, 255, 0.8);
+  transform: translateY(-2px);
+  box-shadow: 
+    0 20px 25px -5px rgba(0, 0, 0, 0.05),
+    0 10px 10px -5px rgba(0, 0, 0, 0.02);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+.text-gradient {
+  background: linear-gradient(135deg, hsl(191, 91%, 36%), hsl(262, 83%, 58%));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 .glass-panel .text-card-foreground,

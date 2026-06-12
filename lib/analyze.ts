@@ -16,9 +16,11 @@ import {
 import {
   evaluateGeneEditingIdea,
   generateIdeasForSeedPaper,
+  generateResearchIdeasWithCitations,
   type GeneratedResearchIdea,
   type IdeaSeedPaper,
 } from "@/lib/research-ideas";
+import { fetchInfluentialCitations } from "@/lib/semantic-scholar";
 import {
   getLocalizedEvaluationCopy,
   getLocalizedIdeaCopy,
@@ -2391,9 +2393,19 @@ export async function analyzeResearchInput(input: AnalyzeRequestInput): Promise<
         : buildPaperStrategySummary(seedPaper, toStructuredFeature(seedExtracted.paper, seedExtracted.extraction), technologyTransferPaths ?? [])
       : undefined;
 
+  let paperModeGeneratedIdeas: GeneratedResearchIdea[] = [];
+  if (mode === "paper" && seedIdeaPaper && seedExtracted) {
+    const citations = seedIdeaPaper.doi ? await fetchInfluentialCitations(seedIdeaPaper.doi) : [];
+    paperModeGeneratedIdeas = await generateResearchIdeasWithCitations(seedIdeaPaper, seedExtracted.extraction, citations);
+  }
+
   const generatedIdeas =
     mode === "paper" && seedIdeaPaper && seedExtracted
-      ? []
+      ? paperModeGeneratedIdeas.map((idea) => ({
+          idea,
+          seedPaper: seedIdeaPaper,
+          extraction: seedExtracted.extraction,
+        }))
       : extracted
           .flatMap(({ paper, extraction }) => {
             const ideaSeedPaper = buildIdeaSeedPaper(paper, extraction, query);
@@ -2406,12 +2418,7 @@ export async function analyzeResearchInput(input: AnalyzeRequestInput): Promise<
           .sort((left, right) => right.idea.score - left.idea.score)
           .slice(0, DEFAULT_PAPER_IDEA_LIMIT);
 
-  const ideas: AnalyzeIdea[] =
-    mode === "paper" && seedIdeaPaper && seedExtracted
-      ? paperInsights
-        ? buildLlmPaperModeIdeas(seedIdeaPaper, seedExtracted.extraction, paperInsights)
-        : buildPaperModeIdeas(seedIdeaPaper, seedExtracted.extraction, technologyTransferPaths ?? [])
-      : generatedIdeas.map(({ idea, seedPaper: generatedSeedPaper, extraction }) => {
+  const ideas: AnalyzeIdea[] = generatedIdeas.map(({ idea, seedPaper: generatedSeedPaper, extraction }) => {
           const localizedSeedPaper = toSyntheticRadarPaper(generatedSeedPaper);
           const localizedIdea = getLocalizedIdeaCopy({ ...idea, paper: localizedSeedPaper });
           const evaluation = evaluateGeneEditingIdea({
@@ -2428,16 +2435,16 @@ export async function analyzeResearchInput(input: AnalyzeRequestInput): Promise<
 
           return {
             id: idea.id,
-            name: localizedIdea.title,
+            name: idea.title, // Use LLM generated title
             innovationType: toZhIdeaType(idea.ideaType),
             transferPath: toZhIdeaType(idea.ideaType),
             priority: classifyPriority(idea.score),
             basedOnPapers: [generatedSeedPaper.title],
-            innovationLogic: localizedIdea.thesis,
-            feasibilityRisk: localizedIdea.risk,
-            feasibilityRationale: localizedIdea.moat,
-            minimumExperimentalPackage: localizedEvaluation.minimumExperimentalPackage,
-            minimumExperimentPackage: localizedEvaluation.minimumExperimentalPackage,
+            innovationLogic: idea.thesis, // Use LLM generated thesis
+            feasibilityRisk: idea.risk,
+            feasibilityRationale: idea.moat,
+            minimumExperimentalPackage: idea.minimumExperimentalPackage,
+            minimumExperimentPackage: idea.minimumExperimentalPackage,
             recommendedJournalTier: localizedEvaluation.journalTier,
             suggestedJournalTier: localizedEvaluation.journalTier,
             articleType: localizedEvaluation.articleType,
@@ -2448,9 +2455,10 @@ export async function analyzeResearchInput(input: AnalyzeRequestInput): Promise<
             publicationPotential: evaluation.publicationPotential,
             publicationPotentialScore: evaluation.publicationPotential,
             competitionRisk: evaluation.competitionRisk,
-            warning: localizedEvaluation.warning,
+            warning: evaluation.warning,
             riskWarnings,
             reliabilityLabel: "AI生成假设",
+            evolutionAnalysis: idea.evolutionAnalysis,
           };
         });
 

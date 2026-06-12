@@ -124,6 +124,46 @@ export async function llmChat(params: LlmChatParams): Promise<string | null> {
 }
 
 /**
+ * 调用 LLM 生成文本向量 (Embedding)。任何失败返回 null。
+ * 默认使用 OpenAI text-embedding-3-small。
+ */
+export async function llmEmbedding(text: string): Promise<number[] | null> {
+  const apiKey = readApiKey();
+
+  if (!apiKey || !text.trim()) {
+    return null;
+  }
+
+  // Embedding 接口通常与 Chat 接口不同（如 DeepSeek 暂无 Embedding），允许独立配置。
+  const baseUrl = (process.env.LLM_EMBEDDING_BASE_URL || "https://api.openai.com/v1").trim().replace(/\/+$/, "");
+  const model = (process.env.LLM_EMBEDDING_MODEL || "text-embedding-3-small").trim();
+
+  try {
+    const response = await fetch(`${baseUrl}/embeddings`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        input: text,
+        model,
+      }),
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const payload = (await response.json()) as { data?: Array<{ embedding?: number[] }> };
+    return payload.data?.[0]?.embedding ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * 从模型输出中剥离可能的 ```json 围栏与首尾噪声，提取最外层 JSON 对象/数组文本。
  */
 export function extractJsonBlock(raw: string): string {

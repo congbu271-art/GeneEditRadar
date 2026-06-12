@@ -24,6 +24,7 @@ import {
   type PaperMatch,
 } from "@/lib/literature";
 import { collectRssLiterature } from "@/lib/literature-rss";
+import { llmEmbedding } from "@/lib/llm";
 import type { RadarSubscription } from "@/lib/mock-data";
 import { prisma } from "@/lib/prisma";
 
@@ -53,6 +54,8 @@ const SOURCE_NAME_MAP: Record<LiteratureSource, LiteratureSourceName> = {
   "europe-pmc": LiteratureSourceName.EUROPE_PMC,
   crossref: LiteratureSourceName.CROSSREF,
   rss: LiteratureSourceName.RSS,
+  biorxiv: LiteratureSourceName.BIORXIV,
+  medrxiv: LiteratureSourceName.MEDRXIV,
   mock: LiteratureSourceName.MOCK,
 };
 
@@ -61,8 +64,8 @@ const REVERSE_SOURCE_NAME_MAP: Record<LiteratureSourceName, LiteratureSource> = 
   [LiteratureSourceName.EUROPE_PMC]: "europe-pmc",
   [LiteratureSourceName.CROSSREF]: "crossref",
   [LiteratureSourceName.RSS]: "rss",
-  [LiteratureSourceName.BIORXIV]: "crossref",
-  [LiteratureSourceName.MEDRXIV]: "crossref",
+  [LiteratureSourceName.BIORXIV]: "biorxiv",
+  [LiteratureSourceName.MEDRXIV]: "medrxiv",
   [LiteratureSourceName.OPENALEX]: "crossref",
   [LiteratureSourceName.SEMANTIC_SCHOLAR]: "crossref",
   [LiteratureSourceName.UNPAYWALL]: "crossref",
@@ -152,6 +155,7 @@ function toCollectedPaper(paper: DbLiteraturePaper): CollectedPaper {
     sources,
     primarySource,
     signalScore: paper.signalScore,
+    fullText: paper.fullText ?? undefined,
   };
 }
 
@@ -235,6 +239,8 @@ async function storeCollectedPaper(paper: CollectedPaper) {
     keywordsText: encodeTextList(paper.keywords),
     signalScore: paper.signalScore,
     lastSeenAt: new Date(),
+    hasFullText: Boolean(paper.fullText),
+    fullText: paper.fullText ?? null,
   };
 
   const stored = existing
@@ -248,6 +254,27 @@ async function storeCollectedPaper(paper: CollectedPaper) {
           firstSeenAt: new Date(),
         },
       });
+
+  // 生成并保存向量 (Embedding) 以支持语义搜索
+  // 如果是新文献或摘要为空的旧文献有了摘要，则尝试生成向量
+  const shouldEmbed = !existing || (!existing.abstract && data.abstract);
+  if (shouldEmbed && data.abstract) {
+    const embeddingText = `${data.title}\n${data.abstract}`.slice(0, 8000);
+    const vector = await llmEmbedding(embeddingText);
+
+    if (vector) {
+      try {
+        // 由于 Prisma 对 vector 类型支持有限，使用原始 SQL 写入
+        await prisma.$executeRawUnsafe(
+          `UPDATE "LiteraturePaper" SET embedding = $1::vector WHERE id = $2`,
+          vector,
+          stored.id,
+        );
+      } catch (e) {
+        console.error(`Failed to store embedding for paper ${stored.id}:`, e);
+      }
+    }
+  }
 
   for (const source of paper.sources.filter((item) => item !== "mock")) {
     const sourceRecordId = paper.sourceIds[source] ?? `${source}:${paper.id}`;

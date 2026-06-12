@@ -14,30 +14,37 @@ type EnrichedPaper = (typeof enrichedPapers)[number];
 
 export function PaperCard({ paper }: { paper: EnrichedPaper }) {
   return (
-    <Card className="h-full overflow-hidden border-slate-200/80 bg-white">
-      <CardHeader>
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge>{toZhPaperStatus(paper.status)}</Badge>
-          <Badge variant="secondary">{toZhModality(paper.modality)}</Badge>
-          <Badge variant="warning">{toZhDiseaseArea(paper.diseaseArea)}</Badge>
+    <Card className="h-full overflow-hidden glass-panel glass-panel-hover border-none shadow-soft">
+      <CardHeader className="pb-4">
+        <div className="flex flex-wrap items-center gap-2 mb-2">
+          <Badge className="bg-cyan-50 text-cyan-700 hover:bg-cyan-100 border-cyan-100/50 shadow-none px-2 py-0">
+            {toZhPaperStatus(paper.status)}
+          </Badge>
+          <Badge variant="secondary" className="bg-slate-100 text-slate-600 border-slate-200/50 shadow-none px-2 py-0">
+            {toZhModality(paper.modality)}
+          </Badge>
         </div>
-        <CardTitle className="text-2xl leading-tight text-slate-950">{paper.title}</CardTitle>
-        <CardDescription>
-          {paper.journal.name} · {formatDate(paper.publishedAt)} · 综合评分 {paper.compositeScore}
+        <CardTitle className="text-xl font-display font-semibold tracking-tight text-slate-900 leading-snug">
+          {paper.title}
+        </CardTitle>
+        <CardDescription className="text-xs font-medium text-slate-400 mt-1" suppressHydrationWarning>
+          {paper.journal.name} <span className="mx-1.5 opacity-30">•</span> {formatDate(paper.publishedAt)} <span className="mx-1.5 opacity-30">•</span> 综合评分 <span className="text-cyan-600">{paper.compositeScore}</span>
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-5">
-        <p className="text-sm leading-7 text-slate-600">{paper.keyTakeaway}</p>
-        <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-          <div className="flex items-center justify-between text-sm text-slate-500">
+      <CardContent className="space-y-6 pt-0">
+        <p className="text-sm leading-relaxed text-slate-600/90">{paper.keyTakeaway}</p>
+        
+        <div className="grid gap-3 rounded-2xl bg-bio-gradient p-4 border border-cyan-50/50">
+          <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-cyan-700/70">
             <span className="flex items-center gap-2">
-              <Microscope className="h-4 w-4 text-cyan-700" />
+              <Microscope className="h-3.5 w-3.5" />
               临床信号
             </span>
-            <span className="font-medium text-slate-950">{toZhPaperStage(paper.stage)}</span>
+            <span className="text-cyan-800">{toZhPaperStage(paper.stage)}</span>
           </div>
-          <p className="text-sm text-slate-600">{paper.clinicalSignal}</p>
+          <p className="text-sm text-slate-700 leading-relaxed">{paper.clinicalSignal}</p>
         </div>
+
         <ScoreBars
           compact
           scores={[
@@ -46,15 +53,19 @@ export function PaperCard({ paper }: { paper: EnrichedPaper }) {
             { label: "转化潜力", value: paper.translationalScore },
           ]}
         />
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-sm text-slate-500">
-            <TrendingUp className="h-4 w-4 text-cyan-700" />
-            被引 {paper.citationCount} 次 · {paper.geneSymbols.join(", ")}
+        
+        <div className="flex flex-wrap items-center justify-between gap-4 pt-2 border-t border-slate-100/50">
+          <div className="flex items-center gap-4 text-xs font-medium text-slate-400">
+            <span className="flex items-center gap-1.5">
+              <TrendingUp className="h-3.5 w-3.5 text-cyan-600" />
+              被引 {paper.citationCount}
+            </span>
+            <span>{paper.geneSymbols.slice(0, 3).join(", ")}</span>
           </div>
-          <Button asChild variant="outline">
+          <Button asChild variant="ghost" className="h-9 rounded-xl hover:bg-cyan-50 hover:text-cyan-700 transition-all text-xs font-semibold">
             <Link href={`/paper/${paper.id}` as Route}>
-              查看文献
-              <ArrowUpRight className="h-4 w-4" />
+              阅读详情
+              <ArrowUpRight className="ml-1.5 h-3.5 w-3.5" />
             </Link>
           </Button>
         </div>
