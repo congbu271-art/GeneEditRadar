@@ -169,9 +169,11 @@ model Subscription {
   isActive               Boolean                 @default(true)
   keywordsText           String?
   authorNamesText        String?
+  authorOrcidsText       String?
   journalNamesText       String?
   organismsText          String?
   editorTypesText        String?
+  email                  String?
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
   journalId              String?

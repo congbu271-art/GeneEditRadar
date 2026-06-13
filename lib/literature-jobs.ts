@@ -27,6 +27,7 @@ import { collectRssLiterature } from "@/lib/literature-rss";
 import { llmEmbedding } from "@/lib/llm";
 import type { RadarSubscription } from "@/lib/mock-data";
 import { prisma } from "@/lib/prisma";
+import { sendEmail, generateDigestHtml, generateDigestText } from "@/lib/email";
 
 type LiteratureJobSummary = {
   ok: boolean;
@@ -56,6 +57,7 @@ const SOURCE_NAME_MAP: Record<LiteratureSource, LiteratureSourceName> = {
   rss: LiteratureSourceName.RSS,
   biorxiv: LiteratureSourceName.BIORXIV,
   medrxiv: LiteratureSourceName.MEDRXIV,
+  openalex: LiteratureSourceName.OPENALEX,
   mock: LiteratureSourceName.MOCK,
 };
 
@@ -66,9 +68,9 @@ const REVERSE_SOURCE_NAME_MAP: Record<LiteratureSourceName, LiteratureSource> = 
   [LiteratureSourceName.RSS]: "rss",
   [LiteratureSourceName.BIORXIV]: "biorxiv",
   [LiteratureSourceName.MEDRXIV]: "medrxiv",
-  [LiteratureSourceName.OPENALEX]: "crossref",
-  [LiteratureSourceName.SEMANTIC_SCHOLAR]: "crossref",
-  [LiteratureSourceName.UNPAYWALL]: "crossref",
+  [LiteratureSourceName.OPENALEX]: "openalex",
+  [LiteratureSourceName.SEMANTIC_SCHOLAR]: "pubmed",
+  [LiteratureSourceName.UNPAYWALL]: "pubmed",
   [LiteratureSourceName.MOCK]: "mock",
 };
 
@@ -486,9 +488,16 @@ export async function runDigestMarkJob(): Promise<LiteratureJobSummary> {
   const candidateMatches = await prisma.subscriptionMatch.findMany({
     take: 200,
     orderBy: { createdAt: "asc" },
+    include: {
+      paper: true,
+      subscription: true,
+    },
   });
+  
   const batchKey = `digest-${new Date().toISOString().slice(0, 10)}`;
   let delivered = 0;
+  
+  const papersByEmail = new Map<string, Array<{ title: string; journal: string; publishedAt?: string; url?: string }>>();
 
   for (const match of candidateMatches) {
     const existing = await prisma.deliveredNotification.findUnique({
@@ -513,7 +522,40 @@ export async function runDigestMarkJob(): Promise<LiteratureJobSummary> {
         batchKey,
       },
     });
+    
+    const paper = match.paper;
+    const paperData = {
+      title: paper.title,
+      journal: paper.journal,
+      publishedAt: paper.publishedAt?.toISOString().split('T')[0],
+      url: paper.doi ? `https://doi.org/${paper.doi}` : undefined,
+    };
+    
+    const emailKey = match.subscriptionId;
+    if (!papersByEmail.has(emailKey)) {
+      papersByEmail.set(emailKey, []);
+    }
+    papersByEmail.get(emailKey)!.push(paperData);
+    
     delivered += 1;
+  }
+  
+  for (const [subscriptionId, papers] of papersByEmail) {
+    const subscription = await prisma.subscription.findUnique({
+      where: { id: subscriptionId },
+    });
+    
+    if (subscription?.email) {
+      const html = generateDigestHtml(papers);
+      const text = generateDigestText(papers);
+      
+      await sendEmail({
+        to: subscription.email,
+        subject: `GeneEditRadar 文献摘要 - ${new Date().toLocaleDateString('zh-CN')}`,
+        html,
+        text,
+      });
+    }
   }
 
   return {

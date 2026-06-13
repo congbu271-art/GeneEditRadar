@@ -72,6 +72,7 @@ export type RadarSubscription = {
   geneSymbol?: string;
   keywords: string[];
   authorNames: string[];
+  authorOrcids?: string[];
   journalNames: string[];
   organisms: string[];
   editorTypes: string[];

@@ -31,7 +31,7 @@ import {
   uniqueStrings,
 } from "@/lib/shared-utils";
 
-export type LiteratureSource = "pubmed" | "europe-pmc" | "crossref" | "rss" | "biorxiv" | "medrxiv" | "mock";
+export type LiteratureSource = "pubmed" | "europe-pmc" | "crossref" | "rss" | "biorxiv" | "medrxiv" | "openalex" | "mock";
 
 export type CollectedPaper = {
   id: string;
@@ -42,6 +42,7 @@ export type CollectedPaper = {
   pmid?: string;
   journal: string;
   authors: string[];
+  authorOrcids?: string[];
   publishedAt?: string;
   url?: string;
   organisms: string[];
@@ -113,6 +114,7 @@ type SourceResult = {
 type ResolvedSubscription = RadarSubscription & {
   allKeywords: string[];
   allAuthorNames: string[];
+  allAuthorOrcids: string[];
   allJournalNames: string[];
   allOrganisms: string[];
   allEditorTypes: string[];
@@ -126,6 +128,7 @@ const SOURCE_PRIORITY: Record<LiteratureSource, number> = {
   medrxiv: 1.5,
   pubmed: 2,
   "europe-pmc": 3,
+  openalex: 2.5,
 };
 
 const MATCH_WEIGHTS = {
@@ -706,6 +709,7 @@ function resolveSubscription(subscription: RadarSubscription): ResolvedSubscript
       ...(topicLabel ? [topicLabel] : []),
     ]),
     allAuthorNames: uniqueStrings(subscription.authorNames),
+    allAuthorOrcids: uniqueStrings(subscription.authorOrcids ?? []),
     allJournalNames: uniqueStrings([...subscription.journalNames, ...(journalName ? [journalName] : [])]),
     allOrganisms: uniqueStrings(subscription.organisms),
     allEditorTypes: uniqueStrings(subscription.editorTypes),
@@ -728,12 +732,20 @@ export function matchPaperToSubscription(paper: CollectedPaper, rawSubscription:
   const normalizedEditorTypes = paper.editorTypes.map(normalizeKeyword);
 
   const matchedKeywords = subscription.allKeywords.filter((keyword) => phraseIncluded(searchText, keyword));
+  
   const matchedAuthors = subscription.allAuthorNames.filter((authorName) => {
     const normalizedAuthor = normalizePersonName(authorName);
     return normalizedAuthors.some(
       (candidate) => candidate.includes(normalizedAuthor) || normalizedAuthor.includes(candidate),
     );
   });
+  
+  const matchedAuthorOrcids = subscription.allAuthorOrcids.filter((orcid) => {
+    return paper.authorOrcids?.some((paperOrcid) => paperOrcid === orcid) ?? false;
+  });
+  
+  const allMatchedAuthors = uniqueStrings([...matchedAuthors, ...matchedAuthorOrcids.map(() => "ORCID匹配")]);
+  
   const matchedJournals = subscription.allJournalNames.filter((journalName) => {
     const normalizedMatch = canonicalizeJournal(journalName);
     return normalizedJournal.length > 0 && (normalizedJournal.includes(normalizedMatch) || normalizedMatch.includes(normalizedJournal));
@@ -748,14 +760,16 @@ export function matchPaperToSubscription(paper: CollectedPaper, rawSubscription:
 
   const activeWeight =
     (subscription.allKeywords.length ? MATCH_WEIGHTS.keywords : 0) +
-    (subscription.allAuthorNames.length ? MATCH_WEIGHTS.authors : 0) +
+    (subscription.allAuthorNames.length + subscription.allAuthorOrcids.length ? MATCH_WEIGHTS.authors : 0) +
     (subscription.allJournalNames.length ? MATCH_WEIGHTS.journals : 0) +
     (subscription.allOrganisms.length ? MATCH_WEIGHTS.organisms : 0) +
     (subscription.allEditorTypes.length ? MATCH_WEIGHTS.editorTypes : 0);
 
   const earnedWeight =
     (subscription.allKeywords.length ? (matchedKeywords.length / subscription.allKeywords.length) * MATCH_WEIGHTS.keywords : 0) +
-    (subscription.allAuthorNames.length ? (matchedAuthors.length / subscription.allAuthorNames.length) * MATCH_WEIGHTS.authors : 0) +
+    ((subscription.allAuthorNames.length + subscription.allAuthorOrcids.length) 
+      ? ((matchedAuthors.length + matchedAuthorOrcids.length) / (subscription.allAuthorNames.length + subscription.allAuthorOrcids.length)) * MATCH_WEIGHTS.authors 
+      : 0) +
     (subscription.allJournalNames.length ? (matchedJournals.length / subscription.allJournalNames.length) * MATCH_WEIGHTS.journals : 0) +
     (subscription.allOrganisms.length ? (matchedOrganisms.length / subscription.allOrganisms.length) * MATCH_WEIGHTS.organisms : 0) +
     (subscription.allEditorTypes.length ? (matchedEditorTypes.length / subscription.allEditorTypes.length) * MATCH_WEIGHTS.editorTypes : 0);
@@ -770,13 +784,13 @@ export function matchPaperToSubscription(paper: CollectedPaper, rawSubscription:
     threshold: subscription.signalThreshold,
     isMatch,
     matchedKeywords,
-    matchedAuthors,
+    matchedAuthors: allMatchedAuthors,
     matchedJournals,
     matchedOrganisms,
     matchedEditorTypes,
     reasons: uniqueStrings([
       ...matchedKeywords.map((item) => `Keyword: ${item}`),
-      ...matchedAuthors.map((item) => `Author: ${item}`),
+      ...allMatchedAuthors.map((item) => `Author: ${item}`),
       ...matchedJournals.map((item) => `Journal: ${item}`),
       ...matchedOrganisms.map((item) => `Organism: ${item}`),
       ...matchedEditorTypes.map((item) => `Editor: ${item}`),
@@ -785,53 +799,55 @@ export function matchPaperToSubscription(paper: CollectedPaper, rawSubscription:
 }
 
 async function searchPreprints(source: "biorxiv" | "medrxiv", limit = DEFAULT_LIMIT_PER_SOURCE): Promise<SourceResult> {
-  const doiPrefix = source === "biorxiv" ? "10.1101" : "10.1101"; // Both are often 10.1101 but medRxiv is also 10.1101. Actually bioRxiv is 10.1101. medRxiv is 10.1101 too? No, medRxiv is 10.1101 as well but different volume?
-  // Actually, let's just use Crossref with a filter.
-  const url = new URL("https://api.crossref.org/works");
-  url.search = new URLSearchParams({
-    query: buildCrossrefQuery(),
-    filter: `prefix:${doiPrefix}`, // bioRxiv prefix
-    rows: String(limit),
-    sort: "published",
-    order: "desc",
-  }).toString();
-
-  type CrossrefItem = {
-    DOI?: string;
-    title?: string[];
-    author?: Array<{ given?: string; family?: string; name?: string }>;
-    issued?: { "date-parts"?: number[][] };
-    "container-title"?: string[];
+  const baseUrl = source === "biorxiv" ? "https://api.biorxiv.org/details/biorxiv" : "https://api.biorxiv.org/details/medrxiv";
+  
+  type BioRxivItem = {
+    doi?: string;
+    title?: string;
+    authors?: string;
+    author_corresponding?: string;
+    author_corresponding_orcid?: string;
+    published?: string;
+    posted?: string;
+    category?: string;
     abstract?: string;
-    URL?: string;
-    type?: string;
+    url?: string;
+    journal?: string;
+    rank?: string;
   };
-
-  type CrossrefResponse = {
-    message?: {
-      items?: CrossrefItem[];
-    };
+  
+  type BioRxivResponse = {
+    messages?: Array<{ status?: string; total?: number }>;
+    collection?: BioRxivItem[];
   };
 
   try {
-    const payload = await fetchJson<CrossrefResponse>(url, "crossref");
-    const items = payload.message?.items ?? [];
-
+    const searchTerms = buildSearchTerms();
+    const query = searchTerms.join(" ");
+    
+    const url = new URL(baseUrl);
+    url.searchParams.set("cursor", "*");
+    url.searchParams.set("per_page", String(Math.min(limit, 100)));
+    
+    const payload = await fetchJson<BioRxivResponse>(url, source);
+    const items = payload.collection ?? [];
+    
     const normalized = items
-      .filter((item) => item.title?.[0])
+      .filter((item) => item.title && item.doi)
       .map((item) => {
-        const title = stripMarkup(item.title?.[0] ?? "");
+        const title = stripMarkup(item.title ?? "");
         const abstract = stripMarkup(item.abstract ?? "");
-        const doi = normalizeDoi(item.DOI);
-
+        const doi = normalizeDoi(item.doi);
+        const authors = item.authors ? item.authors.split("; ").map(a => a.trim()) : [];
+        
         return createCollectedPaper({
           title,
           abstract,
           doi,
           journal: source === "biorxiv" ? "bioRxiv" : "medRxiv",
-          authors: parseAuthorList(item.author),
-          publishedAt: parseCrossrefDate(item.issued?.["date-parts"]),
-          url: buildSourceUrl("crossref", { doi, url: item.URL }, undefined),
+          authors,
+          publishedAt: item.posted || item.published,
+          url: item.url || `https://doi.org/${doi}`,
           organisms: inferOrganisms(title, abstract),
           editorTypes: inferEditorTypes(title, abstract),
           sourceIds: { [source]: doi ?? title },
@@ -857,6 +873,108 @@ async function searchPreprints(source: "biorxiv" | "medrxiv", limit = DEFAULT_LI
   }
 }
 
+async function searchOpenAlex(limit = DEFAULT_LIMIT_PER_SOURCE): Promise<SourceResult> {
+  type OpenAlexAuthor = {
+    display_name?: string;
+    orcid?: string;
+  };
+  
+  type OpenAlexItem = {
+    id?: string;
+    doi?: string;
+    title?: string;
+    display_name?: string;
+    authorships?: Array<{ author?: OpenAlexAuthor }>;
+    publication_date?: string;
+    primary_location?: {
+      source?: {
+        display_name?: string;
+      };
+    };
+    abstract_inverted_index?: Record<string, number[]>;
+    open_access?: {
+      is_oa?: boolean;
+      oa_url?: string;
+    };
+  };
+  
+  type OpenAlexResponse = {
+    results?: OpenAlexItem[];
+    meta?: {
+      count?: number;
+    };
+  };
+
+  try {
+    const searchTerms = buildSearchTerms();
+    const query = searchTerms.join(" ");
+    
+    const url = new URL("https://api.openalex.org/works");
+    url.searchParams.set("search", query);
+    url.searchParams.set("per_page", String(Math.min(limit, 100)));
+    url.searchParams.set("sort", "publication_date:desc");
+    url.searchParams.set("filter", "publication_year:2024-2026");
+    url.searchParams.set("mailto", "team@geneeditradar.demo");
+    
+    const payload = await fetchJson<OpenAlexResponse>(url, "openalex");
+    const items = payload.results ?? [];
+    
+    const normalized = items
+      .filter((item) => item.title && item.doi)
+      .map((item) => {
+        const title = stripMarkup(item.title ?? item.display_name ?? "");
+        const doi = normalizeDoi(item.doi);
+        const authors = item.authorships
+          ?.map((a) => a.author?.display_name)
+          .filter(Boolean) as string[] ?? [];
+        
+        let abstract = "";
+        if (item.abstract_inverted_index) {
+          const words: string[] = [];
+          const entries = Object.entries(item.abstract_inverted_index);
+          for (const [word, positions] of entries) {
+            for (const pos of positions) {
+              words[pos] = word;
+            }
+          }
+          abstract = words.join(" ");
+        }
+        
+        const journal = item.primary_location?.source?.display_name ?? "";
+        
+        return createCollectedPaper({
+          title,
+          abstract,
+          doi,
+          journal,
+          authors,
+          publishedAt: item.publication_date,
+          url: item.open_access?.oa_url || `https://doi.org/${doi}`,
+          organisms: inferOrganisms(title, abstract),
+          editorTypes: inferEditorTypes(title, abstract),
+          sourceIds: { openalex: item.id ?? doi ?? title },
+          sources: ["openalex"],
+          primarySource: "openalex",
+        });
+      });
+
+    return {
+      papers: normalized,
+      status: { source: "openalex", ok: true, count: normalized.length },
+    };
+  } catch (error) {
+    return {
+      papers: [],
+      status: {
+        source: "openalex",
+        ok: false,
+        count: 0,
+        error: error instanceof Error ? error.message : "Unknown openalex error",
+      },
+    };
+  }
+}
+
 export async function collectExternalLiterature(): Promise<LiteratureCollectionResult> {
   const results = await Promise.all([
     searchPubMed(), 
@@ -864,6 +982,7 @@ export async function collectExternalLiterature(): Promise<LiteratureCollectionR
     searchCrossref(),
     searchPreprints("biorxiv"),
     searchPreprints("medrxiv"),
+    searchOpenAlex(),
   ]);
   const collected = results.flatMap((result) => result.papers);
   const deduped = dedupePapers(collected);
