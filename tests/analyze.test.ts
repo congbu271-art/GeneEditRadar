@@ -86,7 +86,8 @@ test("api returns the required analysis output shape", async (t) => {
 
   assert.equal(response.status, 200);
 
-  const payload = (await response.json()) as AnalyzeResponse;
+  const json = (await response.json()) as { data: AnalyzeResponse };
+  const payload = json.data;
 
   assert.equal(payload.mode, "keyword");
   assert.equal(payload.query, "prime editing");
@@ -254,7 +255,8 @@ test("paper-mode API response includes strategy summary and transfer paths", asy
 
   assert.equal(response.status, 200);
 
-  const payload = (await response.json()) as AnalyzeResponse;
+  const json = (await response.json()) as { data: AnalyzeResponse };
+  const payload = json.data;
 
   assert.equal(payload.mode, "paper");
   assert.ok(payload.seedPaper);
