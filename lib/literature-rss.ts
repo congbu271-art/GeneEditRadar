@@ -1,3 +1,5 @@
+import "server-only";
+
 import { XMLParser } from "fast-xml-parser";
 
 import { normalizeDoi, normalizeTitle, type CollectedPaper, type LiteratureSourceStatus } from "@/lib/literature";

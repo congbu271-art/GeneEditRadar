@@ -3,14 +3,24 @@ import { z } from "zod";
 
 import { analyzeResearchInput, normalizeAnalyzeRequest } from "@/lib/analyze";
 
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
 const analyzeRequestSchema = z.object({
   mode: z.enum(["keyword", "paper"]),
-  query: z.string().trim().min(1, "query is required"),
+  query: z.string().trim().min(1, "query is required").max(500, "query 过长"),
 });
 
 export async function POST(request: Request) {
   try {
-    const payload = normalizeAnalyzeRequest(analyzeRequestSchema.parse(await request.json()));
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: "请求体不是有效的 JSON。" }, { status: 400 });
+    }
+
+    const payload = normalizeAnalyzeRequest(analyzeRequestSchema.parse(body));
     const result = await analyzeResearchInput(payload);
 
     return NextResponse.json(result);

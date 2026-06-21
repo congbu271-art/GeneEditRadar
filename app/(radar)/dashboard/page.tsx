@@ -1,6 +1,12 @@
 import type { Route } from "next";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Beaker, BrainCircuit, ChevronRight, ExternalLink, FlaskConical, Radar, Sparkles } from "lucide-react";
+
+export const metadata: Metadata = {
+  title: "文献雷达",
+  description: "今日研究队列：高信号文献、订阅命中与分析入口。",
+};
 
 import { getSubscriptionIntelligence } from "@/lib/literature";
 import { MetricCard } from "@/components/metric-card";

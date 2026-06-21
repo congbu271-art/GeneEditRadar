@@ -1,10 +1,12 @@
+import "server-only";
+
 import { analysisSeedPapers, authors, journals, papers, topics, type RadarPaper } from "@/lib/mock-data";
 import {
   NOT_REPORTED,
-  extractGeneEditingDetails,
   type ExtractionSourcePaper,
   type GeneEditingExtraction,
 } from "@/lib/paper-extraction";
+import { extractGeneEditingDetails } from "@/lib/paper-extraction-llm";
 import {
   dedupePapers,
   normalizeDoi,
@@ -16,11 +18,9 @@ import {
 import {
   evaluateGeneEditingIdea,
   generateIdeasForSeedPaper,
-  generateResearchIdeasWithCitations,
   type GeneratedResearchIdea,
   type IdeaSeedPaper,
 } from "@/lib/research-ideas";
-import { fetchInfluentialCitations } from "@/lib/semantic-scholar";
 import {
   getLocalizedEvaluationCopy,
   getLocalizedIdeaCopy,
@@ -2393,19 +2393,16 @@ export async function analyzeResearchInput(input: AnalyzeRequestInput): Promise<
         : buildPaperStrategySummary(seedPaper, toStructuredFeature(seedExtracted.paper, seedExtracted.extraction), technologyTransferPaths ?? [])
       : undefined;
 
-  let paperModeGeneratedIdeas: GeneratedResearchIdea[] = [];
+  let paperModeIdeas: AnalyzeIdea[] = [];
   if (mode === "paper" && seedIdeaPaper && seedExtracted) {
-    const citations = seedIdeaPaper.doi ? await fetchInfluentialCitations(seedIdeaPaper.doi) : [];
-    paperModeGeneratedIdeas = await generateResearchIdeasWithCitations(seedIdeaPaper, seedExtracted.extraction, citations);
+    paperModeIdeas = paperInsights
+      ? buildLlmPaperModeIdeas(seedIdeaPaper, seedExtracted.extraction, paperInsights)
+      : buildPaperModeIdeas(seedIdeaPaper, seedExtracted.extraction, technologyTransferPaths ?? []);
   }
 
   const generatedIdeas =
-    mode === "paper" && seedIdeaPaper && seedExtracted
-      ? paperModeGeneratedIdeas.map((idea) => ({
-          idea,
-          seedPaper: seedIdeaPaper,
-          extraction: seedExtracted.extraction,
-        }))
+    mode === "paper"
+      ? []
       : extracted
           .flatMap(({ paper, extraction }) => {
             const ideaSeedPaper = buildIdeaSeedPaper(paper, extraction, query);
@@ -2418,7 +2415,10 @@ export async function analyzeResearchInput(input: AnalyzeRequestInput): Promise<
           .sort((left, right) => right.idea.score - left.idea.score)
           .slice(0, DEFAULT_PAPER_IDEA_LIMIT);
 
-  const ideas: AnalyzeIdea[] = generatedIdeas.map(({ idea, seedPaper: generatedSeedPaper, extraction }) => {
+  const ideas: AnalyzeIdea[] =
+    mode === "paper"
+      ? paperModeIdeas
+      : generatedIdeas.map(({ idea, seedPaper: generatedSeedPaper, extraction }) => {
           const localizedSeedPaper = toSyntheticRadarPaper(generatedSeedPaper);
           const localizedIdea = getLocalizedIdeaCopy({ ...idea, paper: localizedSeedPaper });
           const evaluation = evaluateGeneEditingIdea({
@@ -2435,12 +2435,12 @@ export async function analyzeResearchInput(input: AnalyzeRequestInput): Promise<
 
           return {
             id: idea.id,
-            name: idea.title, // Use LLM generated title
+            name: idea.title,
             innovationType: toZhIdeaType(idea.ideaType),
             transferPath: toZhIdeaType(idea.ideaType),
             priority: classifyPriority(idea.score),
             basedOnPapers: [generatedSeedPaper.title],
-            innovationLogic: idea.thesis, // Use LLM generated thesis
+            innovationLogic: idea.thesis,
             feasibilityRisk: idea.risk,
             feasibilityRationale: idea.moat,
             minimumExperimentalPackage: idea.minimumExperimentalPackage,
@@ -2457,7 +2457,7 @@ export async function analyzeResearchInput(input: AnalyzeRequestInput): Promise<
             competitionRisk: evaluation.competitionRisk,
             warning: evaluation.warning,
             riskWarnings,
-            reliabilityLabel: "AI生成假设",
+            reliabilityLabel: "AI生成假设" as const,
             evolutionAnalysis: idea.evolutionAnalysis,
           };
         });

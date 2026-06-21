@@ -17,3 +17,5 @@ prisma/dev.db-journal
 !.env.example
 .next-dev
 tsconfig.tsbuildinfo
+*.profraw
+default.profraw

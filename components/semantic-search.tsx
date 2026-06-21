@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Search, Sparkles, Loader2, BookOpen, ExternalLink } from "lucide-react";
+import { Search, Sparkles, Loader2, BookOpen, ExternalLink, AlertCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -17,12 +17,14 @@ export function SemanticSearch() {
   const [query, setQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState<SemanticResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!query.trim()) return;
 
     setIsLoading(true);
+    setError(null);
     try {
       const res = await fetch("/api/search/semantic", {
         method: "POST",
@@ -30,9 +32,15 @@ export function SemanticSearch() {
         body: JSON.stringify({ query }),
       });
       const data = await res.json();
-      setResults(data);
-    } catch (error) {
-      console.error("语义搜索失败:", error);
+      if (!res.ok) {
+        setError(data.error || "检索失败，请稍后重试。");
+        setResults(null);
+      } else {
+        setResults(data);
+      }
+    } catch {
+      setError("网络错误，请检查连接后重试。");
+      setResults(null);
     } finally {
       setIsLoading(false);
     }
@@ -82,6 +90,14 @@ export function SemanticSearch() {
           </form>
         </CardContent>
       </Card>
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>检索失败</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
       {results?.answer && (
         <div className="animate-in fade-in slide-in-from-top-4 duration-700">

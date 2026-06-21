@@ -1,6 +1,18 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { llmEmbedding, llmChat } from "@/lib/llm";
+import { llmEmbedding, llmChat, isLlmEnabled } from "@/lib/llm";
+
+type SemanticSearchRow = {
+  id: string;
+  title: string;
+  abstract: string;
+  journal: string;
+  authorsText: string;
+  publishedAt: Date;
+  sourceUrl: string | null;
+  signalScore: number;
+  similarity: number;
+};
 
 /**
  * 语义搜索与 RAG (检索增强生成) API
@@ -9,12 +21,32 @@ import { llmEmbedding, llmChat } from "@/lib/llm";
  * 2. 在数据库中进行向量相似度搜索 (pgvector)
  * 3. 将最相关的文献摘要作为上下文，调用 LLM 生成回答
  */
+export const runtime = "nodejs";
+
 export async function POST(req: Request) {
   try {
+    if (!process.env.DATABASE_URL) {
+      return NextResponse.json({
+        error: "语义检索需要数据库支持，当前为演示版。",
+        answer: "当前为演示版，语义检索功能未激活。如需使用，请配置数据库与 LLM API。",
+      }, { status: 503 });
+    }
+
+    if (!isLlmEnabled()) {
+      return NextResponse.json({
+        error: "语义检索需要 LLM API 配置，当前未激活。",
+        answer: "当前未配置 LLM API，语义检索功能不可用。",
+      }, { status: 503 });
+    }
+
     const { query } = await req.json();
 
     if (!query || typeof query !== "string") {
       return NextResponse.json({ error: "查询内容不能为空" }, { status: 400 });
+    }
+
+    if (query.length > 500) {
+      return NextResponse.json({ error: "查询内容过长，请限制在 500 字以内。" }, { status: 400 });
     }
 
     // 1. 向量化用户查询
@@ -27,16 +59,15 @@ export async function POST(req: Request) {
     }
 
     // 2. 执行向量检索 (pgvector)
-    // 注意：Prisma 不原生支持 vector 类型查询，必须使用原始 SQL
-    const papers: any[] = await prisma.$queryRawUnsafe(`
+    const papers = await prisma.$queryRaw<SemanticSearchRow[]>`
       SELECT 
         id, title, abstract, journal, "authorsText", "publishedAt", "sourceUrl", "signalScore",
-        1 - (embedding <=> $1::vector) AS similarity
+        1 - (embedding <=> ${queryVector}::vector) AS similarity
       FROM "LiteraturePaper"
       WHERE embedding IS NOT NULL
-      ORDER BY embedding <=> $1::vector
+      ORDER BY embedding <=> ${queryVector}::vector
       LIMIT 8
-    `, queryVector);
+    `;
 
     // 3. 构建 RAG 回答
     let answer = null;

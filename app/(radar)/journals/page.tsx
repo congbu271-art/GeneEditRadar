@@ -1,5 +1,12 @@
+import type { Metadata } from "next";
 import { JournalCard } from "@/components/journal-card";
 import { PageHeader } from "@/components/page-header";
+
+export const metadata: Metadata = {
+  title: "期刊匹配",
+  description: "跟踪不同期刊在基因编辑方向的覆盖度、审稿周期与接收率，找到最佳投稿窗口。",
+};
+
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { enrichedJournals } from "@/lib/radar-data";

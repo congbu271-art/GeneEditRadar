@@ -1,3 +1,5 @@
+import "server-only";
+
 import { normalizeDoi } from "@/lib/literature";
 
 export type SemanticScholarCitation = {

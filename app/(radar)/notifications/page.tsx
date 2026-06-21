@@ -1,4 +1,10 @@
+import type { Metadata } from "next";
 import { BellRing, Mail, Newspaper, Rss, Send, UserRound } from "lucide-react";
+
+export const metadata: Metadata = {
+  title: "文献通知",
+  description: "订阅命中通知与文献摘要投递配置。",
+};
 
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";

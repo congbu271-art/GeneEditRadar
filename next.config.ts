@@ -3,52 +3,68 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   distDir: process.env.NODE_ENV === "development" ? ".next-dev" : ".next",
   typedRoutes: true,
+  experimental: {
+    optimizePackageImports: ["lucide-react"],
+  },
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+        ],
+      },
+    ];
+  },
   async redirects() {
     return [
       {
         source: "/radar",
         destination: "/dashboard",
-        permanent: false,
+        permanent: true,
       },
       {
         source: "/radar/dashboard",
         destination: "/dashboard",
-        permanent: false,
+        permanent: true,
       },
       {
         source: "/radar/papers",
         destination: "/papers",
-        permanent: false,
+        permanent: true,
       },
       {
         source: "/radar/paper/:id",
         destination: "/paper/:id",
-        permanent: false,
+        permanent: true,
       },
       {
         source: "/radar/subscriptions",
         destination: "/subscriptions",
-        permanent: false,
+        permanent: true,
       },
       {
         source: "/radar/analyze",
         destination: "/analyze",
-        permanent: false,
+        permanent: true,
       },
       {
         source: "/radar/ideas",
         destination: "/ideas",
-        permanent: false,
+        permanent: true,
       },
       {
         source: "/radar/evaluate",
         destination: "/evaluate",
-        permanent: false,
+        permanent: true,
       },
       {
         source: "/radar/journals",
         destination: "/journals",
-        permanent: false,
+        permanent: true,
       },
     ];
   },

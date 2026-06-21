@@ -55,8 +55,8 @@ test("renders compact workbench page headers", () => {
 
   assert.match(html, /文献雷达/);
   assert.match(html, /今日研究队列/);
-  assert.match(html, /bg-white/);
-  assert.match(html, /rounded-2xl/);
+  assert.match(html, /glass-panel/);
+  assert.match(html, /rounded-\[2\.5rem\]/);
 });
 
 test("renders dense metric cards", () => {

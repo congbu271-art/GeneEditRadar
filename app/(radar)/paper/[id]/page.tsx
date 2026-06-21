@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ArrowUpRight, BookCopy, Dna, FlaskConical, Users } from "lucide-react";
 
@@ -7,7 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { enrichedIdeas, enrichedPapers } from "@/lib/radar-data";
-import { buildExtractionSourceFromRadarPaper, extractGeneEditingDetails } from "@/lib/paper-extraction";
+import { buildExtractionSourceFromRadarPaper } from "@/lib/paper-extraction";
+import { extractGeneEditingDetails } from "@/lib/paper-extraction-llm";
 import {
   getZhPaperAbstract,
   toZhArticleType,
@@ -24,6 +26,20 @@ import { formatDate } from "@/lib/utils";
 type PaperDetailPageProps = {
   params: Promise<{ id: string }>;
 };
+
+export async function generateMetadata({ params }: PaperDetailPageProps): Promise<Metadata> {
+  const { id } = await params;
+  const paper = enrichedPapers.find((item) => item.id === id || item.slug === id);
+
+  if (!paper) {
+    return { title: "文献未找到" };
+  }
+
+  return {
+    title: paper.title,
+    description: getZhPaperAbstract(paper.id, paper.abstract).slice(0, 160),
+  };
+}
 
 export default async function PaperDetailPage({ params }: PaperDetailPageProps) {
   const { id } = await params;
@@ -59,12 +75,18 @@ export default async function PaperDetailPage({ params }: PaperDetailPageProps) 
         title={paper.title}
         description={getZhPaperAbstract(paper.id, paper.abstract)}
         actions={
-          <Button asChild variant="outline">
-            <a href={`https://doi.org/${paper.doi}`} target="_blank" rel="noreferrer">
-              查看 DOI
-              <ArrowUpRight className="h-4 w-4" />
-            </a>
-          </Button>
+          paper.doi ? (
+            <Button asChild variant="outline">
+              <a href={`https://doi.org/${paper.doi}`} target="_blank" rel="noreferrer">
+                查看 DOI
+                <ArrowUpRight className="h-4 w-4" />
+              </a>
+            </Button>
+          ) : (
+            <Button variant="outline" disabled>
+              DOI 未报道
+            </Button>
+          )
         }
       />
 

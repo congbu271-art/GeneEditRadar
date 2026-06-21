@@ -5,9 +5,9 @@ import { papers } from "../lib/mock-data";
 import {
   NOT_REPORTED,
   buildExtractionSourceFromRadarPaper,
-  extractGeneEditingDetails,
   extractGeneEditingDetailsRuleBased,
 } from "../lib/paper-extraction";
+import { extractGeneEditingDetails } from "../lib/paper-extraction-llm";
 
 test("rule-based extraction captures explicit gene-editing fields from seeded papers", () => {
   const paper = papers.find((item) => item.id === "paper-pcsk9-prime-lnp");

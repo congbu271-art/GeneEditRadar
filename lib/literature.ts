@@ -1,3 +1,5 @@
+import "server-only";
+
 import { cache } from "react";
 
 import {
@@ -10,10 +12,10 @@ import {
   type RadarSubscription,
 } from "@/lib/mock-data";
 import {
-  extractGeneEditingDetails,
   type ExtractionSourcePaper,
   type GeneEditingExtraction,
 } from "@/lib/paper-extraction";
+import { extractGeneEditingDetails } from "@/lib/paper-extraction-llm";
 
 export type LiteratureSource = "pubmed" | "europe-pmc" | "crossref" | "rss" | "biorxiv" | "medrxiv" | "mock";
 
@@ -726,7 +728,7 @@ async function fetchUnpaywallOA(doi: string): Promise<string | null> {
   url.searchParams.set("email", email);
 
   try {
-    const response = await fetch(url, { signal: AbortSignal.timeout(4000) });
+    const response = await fetch(url, { signal: AbortSignal.timeout(4000), next: { revalidate: 3600 } });
     if (!response.ok) return null;
     const data = await response.json();
     return data.best_oa_location?.url_for_pdf || data.best_oa_location?.url || null;
@@ -746,7 +748,7 @@ async function fetchPmcFullText(pmid?: string, doi?: string): Promise<string | n
   url.searchParams.set("resultType", "core");
 
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
+    const res = await fetch(url, { signal: AbortSignal.timeout(4000), next: { revalidate: 3600 } });
     if (!res.ok) return null;
     const data = await res.json();
     const result = data.resultList?.result?.[0];
@@ -754,7 +756,7 @@ async function fetchPmcFullText(pmid?: string, doi?: string): Promise<string | n
     if (result?.isOpenAccess === "Y" && result.pmcid) {
       // 获取全文 XML
       const fullTextUrl = `https://www.ebi.ac.uk/europepmc/webservices/rest/${result.pmcid}/fullTextXML`;
-      const xmlRes = await fetch(fullTextUrl, { signal: AbortSignal.timeout(5000) });
+      const xmlRes = await fetch(fullTextUrl, { signal: AbortSignal.timeout(5000), next: { revalidate: 3600 } });
       if (xmlRes.ok) {
         const xml = await xmlRes.text();
         // 简单提取正文（去除标签，提取段落）
@@ -778,8 +780,8 @@ export async function enrichCollectedPaper(paper: CollectedPaper): Promise<Extra
     fullText = (await fetchPmcFullText(paper.pmid, paper.doi)) ?? undefined;
     if (!fullText && paper.doi) {
       const oaUrl = await fetchUnpaywallOA(paper.doi);
-      if (oaUrl) {
-        console.log(`Found OA URL for ${paper.doi}: ${oaUrl}`);
+      if (oaUrl && !paper.url) {
+        paper = { ...paper, url: oaUrl };
       }
     }
   }

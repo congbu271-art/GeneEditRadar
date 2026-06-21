@@ -1,4 +1,11 @@
+import type { Metadata } from "next";
 import { IdeaCard } from "@/components/idea-card";
+
+export const metadata: Metadata = {
+  title: "选题机会",
+  description: "基于高信号文献自动生成的基因编辑衍生研究方向，附带评分与分类。",
+};
+
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

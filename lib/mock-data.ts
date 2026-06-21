@@ -225,8 +225,8 @@ export const papers: RadarPaper[] = [
     abstract:
       "A modular prime editor payload paired with tropism-tuned lipid nanoparticles delivered high-efficiency hepatic editing, durable LDL reduction, and a reduced off-target profile in non-human primates.",
     publishedAt: "2026-05-16",
-    doi: "10.9999/ger.2026.001",
-    pmid: "41000001",
+    doi: "",
+    pmid: undefined,
     modality: "Prime editing + LNP",
     diseaseArea: "Cardiometabolic",
     stage: "Preclinical",
@@ -254,8 +254,8 @@ export const papers: RadarPaper[] = [
     abstract:
       "The study demonstrates high on-target HBB correction in hematopoietic stem cells, improved erythroid differentiation, and meaningful anemia rescue in a large-animal model.",
     publishedAt: "2026-04-28",
-    doi: "10.9999/ger.2026.002",
-    pmid: "41000002",
+    doi: "",
+    pmid: undefined,
     modality: "Adenine base editing",
     diseaseArea: "Rare disease",
     stage: "Clinical",
@@ -283,8 +283,8 @@ export const papers: RadarPaper[] = [
     abstract:
       "Researchers combined TRAC disruption, cytokine rewiring, and checkpoint resistance to create allogeneic T cells that persisted longer and showed stronger control of cold tumors in vivo.",
     publishedAt: "2026-04-07",
-    doi: "10.9999/ger.2026.003",
-    pmid: "41000003",
+    doi: "",
+    pmid: undefined,
     modality: "Multiplex CRISPR cell therapy",
     diseaseArea: "Oncology",
     stage: "Preclinical",
@@ -312,8 +312,8 @@ export const papers: RadarPaper[] = [
     abstract:
       "A retina-optimized editor and promoter system restored visual function in rodent and canine models with favorable inflammation and biodistribution profiles.",
     publishedAt: "2026-03-19",
-    doi: "10.9999/ger.2026.004",
-    pmid: "41000004",
+    doi: "",
+    pmid: undefined,
     modality: "Base editing + AAV",
     diseaseArea: "Ophthalmology",
     stage: "Preclinical",
@@ -341,8 +341,8 @@ export const papers: RadarPaper[] = [
     abstract:
       "An integrated single-cell perturbation map identified synthetic-lethal gene editing combinations that selectively impaired growth in TP53-deficient tumor models.",
     publishedAt: "2026-02-11",
-    doi: "10.9999/ger.2026.005",
-    pmid: "41000005",
+    doi: "",
+    pmid: undefined,
     modality: "CRISPR screening",
     diseaseArea: "Oncology",
     stage: "Platform",
@@ -372,8 +372,8 @@ export const analysisSeedPapers: AnalyzeSeedPaper[] = [
     abstract:
       'Dietary deficiencies in essential micronutrients and other phytonutrients represent a global health and economic burden, contributing to "hidden hunger" and chronic diseases. While genome editing has been employed to improve individual nutritional traits in crops, multibiofortification through simultaneous modification of multiple distinct metabolic pathways is more challenging. Here, we designed a multiplex CRISPR-Cas strategy to edit five key genes in tomato: Sl7-DR2, SlGAD3, SlSGR1, SlGGP1, and SlGGP2. This approach successfully generated quintuple mutant (5m) tomato lines simultaneously biofortified with seven health-promoting compounds: vitamin D3, vitamin C, provitamin A/beta-carotene, alpha-carotene, lutein, lycopene, and gamma-aminobutyric acid (GABA). Notably, these multibiofortified tomatoes exhibited no significant trade-offs in plant growth or fruit quality. Extracts from 5m tomatoes showed enhanced suppression of colorectal cancer cell proliferation in vitro. This antiproliferative effect was validated in vivo, where dietary supplementation with 5m tomato powder significantly inhibited tumor growth in a mouse xenograft model. Our work demonstrates an effective strategy for developing a next generation of functional foods through multibiofortification, creating a single, nutrient-dense crop that combats both micronutrient malnutrition and chronic diseases.',
     publishedAt: "2026-06-02",
-    doi: "10.1073/pnas.2603937123",
-    pmid: "42201953",
+    doi: "",
+    pmid: undefined,
     journal: "Proc Natl Acad Sci U S A",
     authors: [
       "Hong Y",

@@ -1,5 +1,11 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, BellRing, Layers3, Sparkles } from "lucide-react";
+
+export const metadata: Metadata = {
+  title: "订阅匹配",
+  description: "按主题、期刊、基因与关键词追踪基因编辑文献，自动匹配订阅条件并标记高信号论文。",
+};
 
 import { getSubscriptionIntelligence } from "@/lib/literature";
 import { PageHeader } from "@/components/page-header";

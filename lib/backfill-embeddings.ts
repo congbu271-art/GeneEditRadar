@@ -1,3 +1,5 @@
+import "server-only";
+
 import { prisma } from "@/lib/prisma";
 import { llmEmbedding } from "@/lib/llm";
 

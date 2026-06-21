@@ -104,7 +104,7 @@ test("missing information is normalized to 未报道", async (t) => {
 
   const payload = await analyzeResearchInput({
     mode: "paper",
-    query: "PMID:41000004",
+    query: "Subretinal base editing of RPE65 corrects inherited blindness with low inflammatory burden",
   });
 
   assert.ok(payload.structuredFeatures.length > 0);
@@ -227,7 +227,7 @@ test("paperStrategySummary is returned with the required shape", async (t) => {
 
   const payload = await analyzeResearchInput({
     mode: "paper",
-    query: "10.9999/ger.2026.004",
+    query: "Subretinal base editing of RPE65 corrects inherited blindness",
   });
 
   assert.ok(payload.paperStrategySummary);

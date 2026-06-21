@@ -5,7 +5,6 @@ import {
   BookOpenText,
   BrainCircuit,
   BellRing,
-  FolderKanban,
   type LucideIcon,
   Newspaper,
   Rss,
@@ -16,6 +15,7 @@ import {
 import { NavLink } from "@/components/nav-link";
 import { Badge } from "@/components/ui/badge";
 import { navigationItems } from "@/lib/radar-data";
+import { isLlmEnabled } from "@/lib/llm";
 
 const iconMap: Record<string, LucideIcon> = {
   "/dashboard": Activity,
@@ -30,6 +30,8 @@ const iconMap: Record<string, LucideIcon> = {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const isDemoMode = !process.env.DATABASE_URL;
+  const isLlmOn = isLlmEnabled();
+  const isRagOn = isLlmOn && !!process.env.DATABASE_URL;
 
   return (
     <div className="relative min-h-screen">
@@ -43,9 +45,16 @@ export function AppShell({ children }: { children: ReactNode }) {
               <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-700/70 mb-0.5">研究工作台</p>
               <p className="font-display text-2xl font-bold tracking-tight text-slate-900">
                 <span className="text-gradient">GeneRadar</span>
+                <span className="ml-2 text-base text-slate-500">基因编辑雷达</span>
               </p>
             </div>
           </div>
+
+          {isDemoMode && (
+            <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50/80 p-3 text-[11px] text-amber-800 leading-relaxed font-medium">
+              当前为演示版，部分结果基于示例数据和规则分析生成。
+            </div>
+          )}
 
           <div className="space-y-6 flex-1 overflow-y-auto pr-2 -mr-2 scrollbar-hide">
             <div className="rounded-3xl bg-bio-gradient p-5 border border-cyan-50/50 space-y-4">
@@ -58,11 +67,13 @@ export function AppShell({ children }: { children: ReactNode }) {
               <div className="space-y-3">
                 <div className="flex items-center justify-between text-[11px] font-medium">
                   <span className="text-slate-400">分析能力</span>
-                  <span className="text-slate-700">混合智能 (Rule+LLM)</span>
+                  <span className="text-slate-700">{isLlmOn ? "混合智能 (Rule+LLM)" : "规则引擎"}</span>
                 </div>
                 <div className="flex items-center justify-between text-[11px] font-medium">
                   <span className="text-slate-400">语义检索</span>
-                  <span className="text-cyan-700">已激活 (RAG)</span>
+                  <span className={isRagOn ? "text-cyan-700" : "text-slate-400"}>
+                    {isRagOn ? "已激活 (RAG)" : "未激活"}
+                  </span>
                 </div>
               </div>
             </div>

@@ -1,4 +1,10 @@
+import type { Metadata } from "next";
 import { Search, SlidersHorizontal } from "lucide-react";
+
+export const metadata: Metadata = {
+  title: "最新文献",
+  description: "从基因编辑文献中完成可操作的初筛，附带商业评分、临床信号与基因专题元数据。",
+};
 
 import { PageHeader } from "@/components/page-header";
 import { PaperCard } from "@/components/paper-card";
@@ -6,8 +12,11 @@ import { SemanticSearch } from "@/components/semantic-search";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { enrichedPapers, topicSignalMap } from "@/lib/radar-data";
+import { isLlmEnabled } from "@/lib/llm";
 
 export default function PapersPage() {
+  const isRagEnabled = isLlmEnabled() && !!process.env.DATABASE_URL;
+
   return (
     <div className="space-y-6 pb-8">
       <PageHeader
@@ -16,7 +25,7 @@ export default function PapersPage() {
         description="每篇文献都附带基础商业评分、临床信号摘要，以及后续构建订阅、选题与评估流程所需的基因与专题元数据。"
       />
 
-      <SemanticSearch />
+      {isRagEnabled && <SemanticSearch />}
 
       <section className="grid gap-6 lg:grid-cols-2">
         {enrichedPapers.map((paper) => (
